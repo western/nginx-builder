@@ -1,0 +1,178 @@
+#!/bin/bash
+
+# save and run
+# ngx_install
+
+PARENTF=`pwd`
+NGINXV='nginx-1.16.1'
+IS_LOCAL=0
+
+
+main() {
+    notice "ngx_install for $NGINXV"
+    notice "from parent folder $PARENTF"
+    notice "IS_LOCAL $IS_LOCAL"
+    
+    pushd 'luajit2.git'
+        mkdir build
+        
+        notice 'make luajit2.git'
+        make -j2
+        make install PREFIX=$PARENTF/luajit2.git/build
+    popd
+    
+    pushd 'opt/lua-cjson.git'
+        notice 'make opt/lua-cjson.git'
+        if [ $IS_LOCAL == 1 ]; then
+            export LUA_INCLUDE_DIR="$PARENTF/luajit2.git/src" && make
+        else
+            export LUA_INCLUDE_DIR="/opt/luajit2.git/src" && make
+        fi
+    popd
+    
+    make_configure
+    
+}
+
+# ------------------------------------------------------------------------------
+
+make_configure() {
+    
+    local PREFIX=""
+    local CONF_PATH=""
+    local PID_PATH=""
+    local ERROR_LOG=""
+    local HTTP_LOG=""
+    local CLIENT_BODY_TEMP=""
+    local PROXY_TEMP_PATH=""
+    local FASTCGI_TEMP_PATH=""
+    local UWSGI_TEMP_PATH=""
+    local SCGI_TEMP_PATH=""
+    
+    if [ $IS_LOCAL == 1 ]; then
+        mkdir -p $PARENTF/build/{tmp,proxy,fastcgi,uwsgi,scgi}
+        PREFIX="$PARENTF/build/"
+        CONF_PATH="$PREFIX/conf/nginx.conf"
+        PID_PATH="$PREFIX/logs/nginx.pid"
+        ERROR_LOG="$PREFIX/logs/error.log"
+        HTTP_LOG="$PREFIX/logs/access.log"
+        CLIENT_BODY_TEMP="$PREFIX/tmp/"
+        PROXY_TEMP_PATH="$PREFIX/proxy/"
+        FASTCGI_TEMP_PATH="$PREFIX/fastcgi/"
+        UWSGI_TEMP_PATH="$PREFIX/uwsgi/"
+        SCGI_TEMP_PATH="$PREFIX/scgi/"
+    else
+        PREFIX="/usr/local/$NGINXV"
+        CONF_PATH="/etc/$NGINXV/nginx.conf"
+        PID_PATH="/var/run/nginx/nginx.pid"
+        ERROR_LOG="/var/log/nginx/error.log"
+        HTTP_LOG="/var/log/nginx/access.log"
+        CLIENT_BODY_TEMP="/var/lib/nginx/tmp/"
+        PROXY_TEMP_PATH="/var/lib/nginx/proxy/"
+        FASTCGI_TEMP_PATH="/var/lib/nginx/fastcgi/"
+        UWSGI_TEMP_PATH="/var/lib/nginx/uwsgi/"
+        SCGI_TEMP_PATH="/var/lib/nginx/scgi/"
+    fi
+    
+    
+cat << L10HEREDOC > $NGINXV/nginx_configuration
+#!/bin/bash
+
+./configure \\
+--with-cc-opt="-Wno-sign-compare -Wno-string-plus-int -Wno-deprecated-declarations -Wno-unused-parameter -Wno-unused-const-variable -Wno-conditional-uninitialized -Wno-mismatched-tags -Wno-sometimes-uninitialized -Wno-parentheses-equality -Wno-tautological-compare -Wno-self-assign -Wno-deprecated-register -Wno-deprecated -Wno-invalid-source-encoding -Wno-pointer-sign -Wno-parentheses -Wno-enum-conversion -Wno-c++11-compat-deprecated-writable-strings -Wno-write-strings" \\
+--with-ld-opt="-Wl,-rpath,../luajit2.git/build/lib" \\
+--prefix=$PREFIX \\
+--conf-path=$CONF_PATH \\
+--pid-path=$PID_PATH \\
+--error-log-path=$ERROR_LOG \\
+--http-log-path=$HTTP_LOG \\
+--http-client-body-temp-path=$CLIENT_BODY_TEMP \\
+--http-proxy-temp-path=$PROXY_TEMP_PATH \\
+--http-fastcgi-temp-path=$FASTCGI_TEMP_PATH \\
+--http-uwsgi-temp-path=$UWSGI_TEMP_PATH \\
+--http-scgi-temp-path=$SCGI_TEMP_PATH \\
+--user=nginx \\
+--group=nginx \\
+--with-http_v2_module \\
+--with-file-aio \\
+--with-http_ssl_module \\
+--with-http_realip_module \\
+--with-http_addition_module \\
+--with-http_image_filter_module \\
+--with-http_geoip_module \\
+--with-http_sub_module \\
+--with-http_gzip_static_module \\
+--with-http_random_index_module \\
+--with-http_secure_link_module \\
+--with-http_stub_status_module \\
+--with-pcre \\
+--with-pcre-jit \\
+--with-libatomic \\
+--add-module=../memc-nginx-module.git/ \\
+--add-module=../lua-nginx-module.git/ \\
+--add-module=../ngx_devel_kit.git/ \\
+--add-module=../redis2-nginx-module.git/ \\
+--add-module=../echo-nginx-module.git/ \\
+--add-module=../form-input-nginx-module.git/ \\
+--add-module=../set-misc-nginx-module.git/ \\
+--add-module=../nginx-upload-module.git/ \\
+--add-module=../ngx_cache_purge.git/ \\
+--add-module=../headers-more-nginx-module.git/ \\
+--add-module=../naxsi.git/naxsi_src/ \\
+
+
+L10HEREDOC
+    
+    chmod +x "$NGINXV/nginx_configuration"
+    
+    notice
+    notice "export LUAJIT_LIB=../luajit2.git/build/lib && export LUAJIT_INC=../luajit2.git/src"
+    notice
+    
+    notice 'run ./nginx_configuration'
+    notice 'make -j4 && make install'
+    notice
+    
+    
+    cd $NGINXV && exec bash
+    
+    
+}
+
+# ------------------------------------------------------------------------------
+
+notice() {
+    builtin echo -en "\033[1m"
+    echo "NOTICE: $@"
+    builtin echo -en "\033[0m"
+}
+
+success() {
+    builtin echo -en "\033[1;32m"
+    echo "SUCCESS: $@"
+    builtin echo -en "\033[0m"
+}
+
+warn() {
+    builtin echo -en "\033[1;33m"
+    echo "WARN: $@"
+    builtin echo -en "\033[0m"
+}
+
+err() {
+    builtin echo -en "\033[1;31m"
+    echo "ERR: $@"
+    builtin echo -en "\033[0m"
+    exit 1
+}
+
+fatal() {
+    builtin echo -en "\033[1;31m"
+    echo "FATAL: $@"
+    builtin echo -en "\033[0m"
+    exit 1
+}
+
+# ------------------------------------------------------------------------------
+
+main
