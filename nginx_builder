@@ -35,28 +35,48 @@ function prepare_for_archive {
     notice "prepare_for_archive"
     
     for mfold in echo-nginx-module.git form-input-nginx-module.git headers-more-nginx-module.git \
-        luajit2.git lua-nginx-module.git memc-nginx-module.git naxsi.git nginx-upload-module.git \
+        luajit2.git lua-nginx-module.git memc-nginx-module.git naxsi.git sregex.git \
+        replace-filter-nginx-module.git drizzle-nginx-module.git ngx_postgres.git nginx-upload-module.git \
         ngx_cache_purge.git ngx_devel_kit.git redis2-nginx-module.git set-misc-nginx-module.git
     do
-        echo "remove [$mfold/.git] folder"
+        warn "remove [$mfold/.git] folder"
         rm -rf "$mfold/.git"
     done
     
     if [ $IS_LOCAL == 1 ]; then
-        for mfold in opt/lua-cjson.git opt/lua-resty-cookie.git opt/lua-resty-core.git opt/lua-resty-lrucache.git \
-            opt/lua-resty-redis.git
-        do
-            echo "remove [$mfold/.git] folder"
-            rm -rf "$mfold/.git"
-        done
+        pushd 'opt'
+            for mfold in lua-cjson.git lua-resty-cookie.git lua-resty-core.git lua-resty-lrucache.git \
+                lua-resty-mysql.git lua-resty-redis.git lua-ssl-nginx-module.git
+            do
+                warn "remove [$mfold/.git] folder"
+                rm -rf "$mfold/.git"
+            done
+        popd
     fi
     
-    cd luajit2.git && make clean && rm -rf build && cd ..
-    cd opt/lua-cjson.git && make clean && cd ../../
+    pushd 'luajit2.git'
+        warn `pwd`
+        rm -rf build ; mkdir build
+        make clean
+    popd
+    pushd 'sregex.git'
+        warn `pwd`
+        rm -rf build ; mkdir build
+        make clean
+    popd
+    pushd 'drizzle7-2011.07.21'
+        warn `pwd`
+        rm -rf build ; mkdir build
+        make clean
+    popd
+    pushd 'opt/lua-cjson.git'
+        warn `pwd`
+        make clean
+    popd
+    
     
     rm -rf $NGINXV
     tar xf $NGINXV.tar.gz
-    rm $NGINXV.tar.gz
 }
 
 # ------------------------------------------------------------------------------
@@ -110,6 +130,42 @@ function repo_get {
     get_github 'FRiCKLE' 'ngx_cache_purge.git'
     get_github 'openresty' 'headers-more-nginx-module.git'
     get_github 'nbs-system' 'naxsi.git'
+    get_github 'openresty' 'sregex.git'
+    
+    pushd 'sregex.git'
+        make clean
+        rm -rf build ; mkdir build
+        
+        if [ $IS_LOCAL == 1 ]; then
+            make -j4 PREFIX=$PARENTF/sregex.git/build
+            make install PREFIX=$PARENTF/sregex.git/build
+        else
+            make -j4
+            make install
+        fi
+    popd
+    
+    get_github 'openresty' 'replace-filter-nginx-module.git'
+    get_github 'openresty' 'drizzle-nginx-module.git'
+    
+    if [ ! -f drizzle7-2011.07.21.tar.gz ]; then
+        wget https://agentzh.org/misc/nginx/drizzle7-2011.07.21.tar.gz
+        tar xf drizzle7-2011.07.21.tar.gz
+    fi
+    pushd 'drizzle7-2011.07.21'
+        rm -rf build ; mkdir build
+        
+        if [ $IS_LOCAL == 1 ]; then
+            ./configure --without-server --prefix=$PARENTF/drizzle7-2011.07.21/build
+        else
+            ./configure --without-server
+        fi
+        
+        make libdrizzle-1.0 -j4
+        make install-libdrizzle-1.0 -j4
+    popd
+    
+    get_github 'openresty' 'ngx_postgres.git'
 }
 
 # ------------------------------------------------------------------------------
@@ -123,7 +179,7 @@ function luajit2_git_prepare {
         make clean
         mkdir build
         
-        make -j2 PREFIX=$PARENTF/luajit2.git/build
+        make -j4 PREFIX=$PARENTF/luajit2.git/build
         make install PREFIX=$PARENTF/luajit2.git/build
     popd
 }
@@ -146,30 +202,26 @@ function lua_addition_prepare {
     get_github 'openresty' 'lua-cjson.git'
     
     pushd 'lua-cjson.git'
-        if [ $IS_LOCAL == 1 ]; then
-            echo
-            echo "export LUA_INCLUDE_DIR=\"$PARENTF/luajit2.git/src\" && make"
-            echo
-            export LUA_INCLUDE_DIR="$PARENTF/luajit2.git/src" && make
-        else
-            echo
-            echo "export LUA_INCLUDE_DIR=\"/opt/luajit2.git/src\" && make"
-            echo
-            export LUA_INCLUDE_DIR="/opt/luajit2.git/src" && make
-        fi
+        echo
+        echo "export LUA_INCLUDE_DIR=\"$PARENTF/luajit2.git/src\" && make -j4"
+        echo
+        export LUA_INCLUDE_DIR="$PARENTF/luajit2.git/src" && make -j4
+        
+        read -p "Press [Enter] key to continue..."
     popd
     
     get_github 'openresty' 'lua-resty-redis.git'
     get_github 'cloudflare' 'lua-resty-cookie.git'
-    
+    get_github 'openresty' 'lua-resty-mysql.git'
+    get_github 'openresty' 'lua-ssl-nginx-module.git'
     
     echo
     notice "save these strings:"
     if [ $IS_LOCAL == 1 ]; then
-        echo "lua_package_path \"$PARENTF/opt/lua-resty-core.git/lib/?.lua;$PARENTF/opt/lua-resty-lrucache.git/lib/?.lua;$PARENTF/opt/lua-resty-redis.git/lib/?.lua;;\";"
+        echo "lua_package_path \"$PARENTF/opt/lua-resty-core.git/lib/?.lua;$PARENTF/opt/lua-resty-lrucache.git/lib/?.lua;$PARENTF/opt/lua-resty-redis.git/lib/?.lua;$PARENTF/opt/lua-resty-mysql.git/lib/?.lua;$PARENTF/opt/lua-ssl-nginx-module.git/lib/?.lua;;\";"
         echo "lua_package_cpath \"$PARENTF/opt/lua-cjson.git/?.so;;\";"
     else
-        echo "lua_package_path \"/opt/lua-resty-core.git/lib/?.lua;/opt/lua-resty-lrucache.git/lib/?.lua;/opt/lua-resty-redis.git/lib/?.lua;;\";"
+        echo "lua_package_path \"/opt/lua-resty-core.git/lib/?.lua;/opt/lua-resty-lrucache.git/lib/?.lua;/opt/lua-resty-redis.git/lib/?.lua;/opt/lua-resty-mysql.git/lib/?.lua;/opt/lua-ssl-nginx-module.git/lib/?.lua;;\";"
         echo "lua_package_cpath \"/opt/lua-cjson.git/?.so;;\";"
     fi
     echo
@@ -281,15 +333,26 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --add-module=../ngx_cache_purge.git/ \\
 --add-module=../headers-more-nginx-module.git/ \\
 --add-module=../naxsi.git/naxsi_src/ \\
-
+--add-module=../replace-filter-nginx-module.git/ \\
+--add-module=../drizzle-nginx-module.git/ \\
+--add-module=../ngx_postgres.git/ \\
 
 L10HEREDOC
     
     chmod +x "$NGINXV/nginx_configuration"
     
+    notice "export these environment:"
+    echo "unset LUAJIT_LIB && unset LUAJIT_INC"
+    echo "unset SREGEX_LIB && unset SREGEX_INC"
+    echo "unset LIBDRIZZLE_INC && unset LIBDRIZZLE_LIB"
+    echo
+    echo "export LUAJIT_LIB=../luajit2.git/build/lib && export LUAJIT_INC=../luajit2.git/src"
+    if [ $IS_LOCAL == 1 ]; then
+        echo "export SREGEX_LIB=../sregex.git/build/lib && export SREGEX_INC=../sregex.git/src"
+        echo "export LIBDRIZZLE_INC=../drizzle7-2011.07.21/build/include/libdrizzle-1.0 && export LIBDRIZZLE_LIB=../drizzle7-2011.07.21/build/lib64/"
+    fi
     notice
-    notice "export LUAJIT_LIB=../luajit2.git/build/lib && export LUAJIT_INC=../luajit2.git/src"
-    notice
+    
     
     notice 'run ./nginx_configuration'
     notice 'make -j4 && make install'
@@ -389,7 +452,7 @@ function fatal {
 }
 
 function get_github {
-    notice "get_github ($1, $2) => github.com/$1/$2"
+    notice "github.com/$1/$2"
     local folderName=$2
     
     if [ -d $folderName ]; then
