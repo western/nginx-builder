@@ -5,7 +5,7 @@
 
 PARENTF=`pwd`
 NGINXV='nginx-1.16.1'
-IS_LOCAL=0
+IS_LOCAL=1
 
 
 main() {
@@ -21,13 +21,43 @@ main() {
         make install PREFIX=$PARENTF/luajit2.git/build
     popd
     
+    pushd 'sregex.git'
+        notice 'make sregex.git'
+        make clean
+        rm -rf build ; mkdir build
+        
+        if [ $IS_LOCAL == 1 ]; then
+            make -j4 PREFIX=$PARENTF/sregex.git/build
+            make install PREFIX=$PARENTF/sregex.git/build
+        else
+            make -j4
+            make install
+        fi
+    popd
+    
+    pushd 'drizzle7-2011.07.21'
+        notice 'make drizzle7-2011.07.21'
+        rm -rf build ; mkdir build
+        
+        if [ $IS_LOCAL == 1 ]; then
+            ./configure --without-server --prefix=$PARENTF/drizzle7-2011.07.21/build
+        else
+            ./configure --without-server
+        fi
+        
+        make libdrizzle-1.0 -j4
+        make install-libdrizzle-1.0 -j4
+    popd
+    
     pushd 'opt/lua-cjson.git'
         notice 'make opt/lua-cjson.git'
-        if [ $IS_LOCAL == 1 ]; then
-            export LUA_INCLUDE_DIR="$PARENTF/luajit2.git/src" && make
-        else
-            export LUA_INCLUDE_DIR="/opt/luajit2.git/src" && make
-        fi
+        
+        echo
+        echo "export LUA_INCLUDE_DIR=\"$PARENTF/luajit2.git/src\" && make -j4"
+        echo
+        export LUA_INCLUDE_DIR="$PARENTF/luajit2.git/src" && make -j4
+        
+        read -p "Press [Enter] key to continue..."
     popd
     
     make_configure
@@ -119,14 +149,25 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --add-module=../ngx_cache_purge.git/ \\
 --add-module=../headers-more-nginx-module.git/ \\
 --add-module=../naxsi.git/naxsi_src/ \\
+--add-module=../replace-filter-nginx-module.git/ \\
+--add-module=../drizzle-nginx-module.git/ \\
+--add-module=../ngx_postgres.git/ \\
 
 
 L10HEREDOC
     
     chmod +x "$NGINXV/nginx_configuration"
     
-    notice
-    notice "export LUAJIT_LIB=../luajit2.git/build/lib && export LUAJIT_INC=../luajit2.git/src"
+    notice "export these environment:"
+    echo "unset LUAJIT_LIB && unset LUAJIT_INC"
+    echo "unset SREGEX_LIB && unset SREGEX_INC"
+    echo "unset LIBDRIZZLE_INC && unset LIBDRIZZLE_LIB"
+    echo
+    echo "export LUAJIT_LIB=../luajit2.git/build/lib && export LUAJIT_INC=../luajit2.git/src"
+    if [ $IS_LOCAL == 1 ]; then
+        echo "export SREGEX_LIB=../sregex.git/build/lib && export SREGEX_INC=../sregex.git/src"
+        echo "export LIBDRIZZLE_INC=../drizzle7-2011.07.21/build/include/libdrizzle-1.0 && export LIBDRIZZLE_LIB=../drizzle7-2011.07.21/build/lib64/"
+    fi
     notice
     
     notice 'run ./nginx_configuration'
