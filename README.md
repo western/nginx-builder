@@ -57,13 +57,12 @@ v0.01rc3
 
 ## new modules
 
-* drizzle-nginx-module.git/
-* drizzle7-2011.07.21/
-* nginx-1.16.1.tar.gz
-* ngx_postgres.git/
-* opt/lua-resty-mysql.git/
-* opt/lua-ssl-nginx-module.git/
-* replace-filter-nginx-module.git/
+* drizzle-nginx-module.git
+* drizzle7-2011.07.21
+* ngx_postgres.git
+* opt/lua-resty-mysql.git
+* opt/lua-ssl-nginx-module.git
+* replace-filter-nginx-module.git
 * sregex.git
 
 ## synopsis
