@@ -1,5 +1,5 @@
 # nginx-builder
-Last Nginx with steroids
+Latest Nginx with steroids
 
 based on https://gist.github.com/western/c04efe49745f24874c43
 
