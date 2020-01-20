@@ -150,6 +150,7 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --add-module=../headers-more-nginx-module.git/ \\
 --add-module=../naxsi.git/naxsi_src/ \\
 --add-module=../replace-filter-nginx-module.git/ \\
+--add-module=../rds-json-nginx-module.git/ \\
 --add-module=../drizzle-nginx-module.git/ \\
 --add-module=../ngx_postgres.git/ \\
 

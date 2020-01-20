@@ -36,8 +36,9 @@ function prepare_for_archive {
     
     for mfold in echo-nginx-module.git form-input-nginx-module.git headers-more-nginx-module.git \
         luajit2.git lua-nginx-module.git memc-nginx-module.git naxsi.git sregex.git \
-        replace-filter-nginx-module.git drizzle-nginx-module.git ngx_postgres.git nginx-upload-module.git \
-        ngx_cache_purge.git ngx_devel_kit.git redis2-nginx-module.git set-misc-nginx-module.git
+        replace-filter-nginx-module.git drizzle-nginx-module.git rds-json-nginx-module.git \
+        ngx_postgres.git nginx-upload-module.git ngx_cache_purge.git ngx_devel_kit.git \
+        redis2-nginx-module.git set-misc-nginx-module.git
     do
         warn "remove [$mfold/.git] folder"
         rm -rf "$mfold/.git"
@@ -97,7 +98,7 @@ function root_prepare {
     if cat /etc/*release* | grep -q 'openSUSE Leap 15.1'; then
         warn 'openSUSE Leap 15.1 detected.'
         zypper in -t pattern -y devel_C_C++ devel_basis devel_perl console
-        zypper in -y pcre-devel libopenssl-devel gd-devel libGeoIP-devel libatomic_ops-devel
+        zypper in -y pcre-devel libopenssl-devel gd-devel libGeoIP-devel libatomic_ops-devel dialog
     fi
     
     if [ $IS_LOCAL == 0 ]; then
@@ -120,7 +121,7 @@ function repo_get {
     notice "repo_get"
     
     get_github 'openresty' 'memc-nginx-module.git'
-    get_github 'chaoslawful' 'lua-nginx-module.git'
+    get_github 'openresty' 'lua-nginx-module.git'
     get_github 'simplresty' 'ngx_devel_kit.git'
     get_github 'openresty' 'redis2-nginx-module.git'
     get_github 'openresty' 'echo-nginx-module.git'
@@ -143,6 +144,7 @@ function repo_get {
             make -j4
             make install
         fi
+        ldconfig
     popd
     
     get_github 'openresty' 'replace-filter-nginx-module.git'
@@ -163,8 +165,10 @@ function repo_get {
         
         make libdrizzle-1.0 -j4
         make install-libdrizzle-1.0 -j4
+        ldconfig
     popd
     
+    get_github 'openresty' 'rds-json-nginx-module.git'
     get_github 'openresty' 'ngx_postgres.git'
 }
 
@@ -334,6 +338,7 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --add-module=../headers-more-nginx-module.git/ \\
 --add-module=../naxsi.git/naxsi_src/ \\
 --add-module=../replace-filter-nginx-module.git/ \\
+--add-module=../rds-json-nginx-module.git/ \\
 --add-module=../drizzle-nginx-module.git/ \\
 --add-module=../ngx_postgres.git/ \\
 
@@ -419,6 +424,25 @@ L12HEREDOC
 
 # ------------------------------------------------------------------------------
 
+function get_github {
+    notice "https://github.com/$1/$2"
+    local folderName=$2
+    
+    if [ -d $folderName ]; then
+        cd $folderName
+        pwd
+        git pull
+        cd ..
+    else
+        git clone https://github.com/$1/$folderName $folderName
+    fi
+    pushd $folderName
+        git describe --tags --abbrev=0
+    popd
+}
+
+# ------------------------------------------------------------------------------
+
 function notice {
     builtin echo -en "\033[1m"
     echo "NOTICE: $@"
@@ -449,23 +473,6 @@ function fatal {
     echo "FATAL: $@"
     builtin echo -en "\033[0m"
     exit 1
-}
-
-function get_github {
-    notice "github.com/$1/$2"
-    local folderName=$2
-    
-    if [ -d $folderName ]; then
-        cd $folderName
-        pwd
-        git pull
-        cd ..
-    else
-        git clone https://github.com/$1/$folderName $folderName
-    fi
-    pushd $folderName
-        git describe --tags --abbrev=0
-    popd
 }
 
 # ------------------------------------------------------------------------------
