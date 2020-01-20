@@ -64,7 +64,7 @@
                 <loctext xml:lang="C">Drizzle database server</loctext>
             </common_name>
             <documentation>
-                <manpage title="drizzle" section="1" manpath="/home/andrey/Code/nginx-builder.git/drizzle7-2011.07.21/build/share/man" />
+                <manpage title="drizzle" section="1" manpath="/usr/local/share/man" />
             </documentation>
         </template>
     </service>
