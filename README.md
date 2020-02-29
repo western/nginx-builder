@@ -40,6 +40,8 @@ drizzle7-2011.07.21.tar.gz
 0.15
 * github.com/openresty/ngx_postgres.git
 1.0
+* github.com/openssl/openssl.git
+1.1.1d
 * github.com/openresty/luajit2.git
 v2.1-20190912
 * github.com/openresty/lua-resty-core.git
@@ -59,7 +61,7 @@ v0.01rc3
 
 ## new modules
 
-* rds-json-nginx-module.git
+* OpenSSL 1.1.1d
 
 ## synopsis
 * download release of package
