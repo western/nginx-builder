@@ -1,5 +1,5 @@
 # nginx-builder
-Last Nginx with steroids
+Latest Nginx with steroids
 
 based on https://gist.github.com/western/c04efe49745f24874c43
 
@@ -36,6 +36,8 @@ v0.01rc5
 v0.1.11
 * https://agentzh.org/misc/nginx/drizzle7-2011.07.21.tar.gz
 drizzle7-2011.07.21.tar.gz
+* github.com/openresty/rds-json-nginx-module.git
+0.15
 * github.com/openresty/ngx_postgres.git
 1.0
 * github.com/openresty/luajit2.git
@@ -57,13 +59,7 @@ v0.01rc3
 
 ## new modules
 
-* drizzle-nginx-module.git
-* drizzle7-2011.07.21
-* ngx_postgres.git
-* opt/lua-resty-mysql.git
-* opt/lua-ssl-nginx-module.git
-* replace-filter-nginx-module.git
-* sregex.git
+* rds-json-nginx-module.git
 
 ## synopsis
 * download release of package
