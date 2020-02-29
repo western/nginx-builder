@@ -221,7 +221,7 @@ performance level.
 
 The latest version of this module is compatible with the following versions of Nginx:
 
-* 1.17.x  (last tested: 1.17.4)
+* 1.17.x  (last tested: 1.17.8)
 * 1.15.x  (last tested: 1.15.8)
 * 1.14.x
 * 1.13.x  (last tested: 1.13.6)
@@ -4662,7 +4662,7 @@ Since <code>v0.8.3</code> this function returns <code>1</code> on success, or re
 
 '''context:''' ''rewrite_by_lua*, access_by_lua*, content_by_lua*, ngx.timer.*, ssl_certificate_by_lua*, ssl_session_fetch_by_lua*''
 
-Sleeps for the specified seconds without blocking. One can specify time resolution up to 0.001 seconds (i.e., one milliseconds).
+Sleeps for the specified seconds without blocking. One can specify time resolution up to 0.001 seconds (i.e., one millisecond).
 
 Behind the scene, this method makes use of the Nginx timers.
 
