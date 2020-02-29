@@ -78,6 +78,8 @@ make_configure() {
     local FASTCGI_TEMP_PATH=""
     local UWSGI_TEMP_PATH=""
     local SCGI_TEMP_PATH=""
+    local LUAJIT2_BUILD_LIB=""
+    local LUAJIT2_SRC=""
     
     if [ $IS_LOCAL == 1 ]; then
         mkdir -p $PARENTF/build/{tmp,proxy,fastcgi,uwsgi,scgi}
@@ -91,6 +93,8 @@ make_configure() {
         FASTCGI_TEMP_PATH="$PREFIX/fastcgi/"
         UWSGI_TEMP_PATH="$PREFIX/uwsgi/"
         SCGI_TEMP_PATH="$PREFIX/scgi/"
+        LUAJIT2_BUILD_LIB="$PARENTF/opt/luajit2.git/build/lib"
+        LUAJIT2_SRC="$PARENTF/opt/luajit2.git/src"
     else
         PREFIX="/usr/local/$NGINXV"
         CONF_PATH="/etc/$NGINXV/nginx.conf"
@@ -102,15 +106,21 @@ make_configure() {
         FASTCGI_TEMP_PATH="/var/lib/nginx/fastcgi/"
         UWSGI_TEMP_PATH="/var/lib/nginx/uwsgi/"
         SCGI_TEMP_PATH="/var/lib/nginx/scgi/"
+        LUAJIT2_BUILD_LIB="/opt/luajit2.git/build/lib"
+        LUAJIT2_SRC="/opt/luajit2.git/src"
     fi
     
+    WITH_OPENSSL=""
+    if [ -d openssl-OpenSSL_1_1_1d ]; then
+        WITH_OPENSSL="--with-openssl=$PARENTF/openssl-OpenSSL_1_1_1d --with-openssl-opt='enable-tls1_3'"
+    fi
     
 cat << L10HEREDOC > $NGINXV/nginx_configuration
 #!/bin/bash
 
 ./configure \\
 --with-cc-opt="-Wno-sign-compare -Wno-string-plus-int -Wno-deprecated-declarations -Wno-unused-parameter -Wno-unused-const-variable -Wno-conditional-uninitialized -Wno-mismatched-tags -Wno-sometimes-uninitialized -Wno-parentheses-equality -Wno-tautological-compare -Wno-self-assign -Wno-deprecated-register -Wno-deprecated -Wno-invalid-source-encoding -Wno-pointer-sign -Wno-parentheses -Wno-enum-conversion -Wno-c++11-compat-deprecated-writable-strings -Wno-write-strings" \\
---with-ld-opt="-Wl,-rpath,../luajit2.git/build/lib" \\
+--with-ld-opt="-Wl,-rpath,$LUAJIT2_BUILD_LIB" \\
 --prefix=$PREFIX \\
 --conf-path=$CONF_PATH \\
 --pid-path=$PID_PATH \\
@@ -125,7 +135,7 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --group=nginx \\
 --with-http_v2_module \\
 --with-file-aio \\
---with-http_ssl_module \\
+--with-http_ssl_module $WITH_OPENSSL \\
 --with-http_realip_module \\
 --with-http_addition_module \\
 --with-http_image_filter_module \\
@@ -150,6 +160,7 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --add-module=../headers-more-nginx-module.git/ \\
 --add-module=../naxsi.git/naxsi_src/ \\
 --add-module=../replace-filter-nginx-module.git/ \\
+--add-module=../rds-json-nginx-module.git/ \\
 --add-module=../drizzle-nginx-module.git/ \\
 --add-module=../ngx_postgres.git/ \\
 
@@ -163,7 +174,8 @@ L10HEREDOC
     echo "unset SREGEX_LIB && unset SREGEX_INC"
     echo "unset LIBDRIZZLE_INC && unset LIBDRIZZLE_LIB"
     echo
-    echo "export LUAJIT_LIB=../luajit2.git/build/lib && export LUAJIT_INC=../luajit2.git/src"
+    echo "export LUAJIT_LIB=$LUAJIT2_BUILD_LIB && export LUAJIT_INC=$LUAJIT2_SRC"
+    
     if [ $IS_LOCAL == 1 ]; then
         echo "export SREGEX_LIB=../sregex.git/build/lib && export SREGEX_INC=../sregex.git/src"
         echo "export LIBDRIZZLE_INC=../drizzle7-2011.07.21/build/include/libdrizzle-1.0 && export LIBDRIZZLE_LIB=../drizzle7-2011.07.21/build/lib64/"
