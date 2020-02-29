@@ -16,7 +16,7 @@
 
 . /lib/svc/share/smf_include.sh
 
-prefix=/home/andrey/Code/nginx-builder.git/drizzle7-2011.07.21/build
+prefix=/usr/local
 exec_prefix=${prefix}
 datadir=`svcprop -p drizzle/datadir $SMF_FMRI`
 
