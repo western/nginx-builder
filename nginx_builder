@@ -21,8 +21,9 @@ function main {
     repo_get
     luajit2_git_prepare
     lua_addition_prepare
+    openssl_get
     nginx_get
-    make_configure
+    #make_configure
     #make_service
     #make_run_schedule
     #prepare_for_archive
@@ -35,9 +36,10 @@ function prepare_for_archive {
     notice "prepare_for_archive"
     
     for mfold in echo-nginx-module.git form-input-nginx-module.git headers-more-nginx-module.git \
-        luajit2.git lua-nginx-module.git memc-nginx-module.git naxsi.git sregex.git \
-        replace-filter-nginx-module.git drizzle-nginx-module.git ngx_postgres.git nginx-upload-module.git \
-        ngx_cache_purge.git ngx_devel_kit.git redis2-nginx-module.git set-misc-nginx-module.git
+        lua-nginx-module.git memc-nginx-module.git naxsi.git sregex.git \
+        replace-filter-nginx-module.git drizzle-nginx-module.git rds-json-nginx-module.git \
+        ngx_postgres.git nginx-upload-module.git ngx_cache_purge.git ngx_devel_kit.git \
+        redis2-nginx-module.git set-misc-nginx-module.git
     do
         warn "remove [$mfold/.git] folder"
         rm -rf "$mfold/.git"
@@ -46,7 +48,8 @@ function prepare_for_archive {
     if [ $IS_LOCAL == 1 ]; then
         pushd 'opt'
             for mfold in lua-cjson.git lua-resty-cookie.git lua-resty-core.git lua-resty-lrucache.git \
-                lua-resty-mysql.git lua-resty-redis.git lua-ssl-nginx-module.git
+                lua-resty-mysql.git lua-resty-redis.git lua-ssl-nginx-module.git \
+                luajit2.git
             do
                 warn "remove [$mfold/.git] folder"
                 rm -rf "$mfold/.git"
@@ -54,7 +57,7 @@ function prepare_for_archive {
         popd
     fi
     
-    pushd 'luajit2.git'
+    pushd 'opt/luajit2.git'
         warn `pwd`
         rm -rf build ; mkdir build
         make clean
@@ -97,7 +100,7 @@ function root_prepare {
     if cat /etc/*release* | grep -q 'openSUSE Leap 15.1'; then
         warn 'openSUSE Leap 15.1 detected.'
         zypper in -t pattern -y devel_C_C++ devel_basis devel_perl console
-        zypper in -y pcre-devel libopenssl-devel gd-devel libGeoIP-devel libatomic_ops-devel
+        zypper in -y pcre-devel libopenssl-devel gd-devel libGeoIP-devel libatomic_ops-devel dialog
     fi
     
     if [ $IS_LOCAL == 0 ]; then
@@ -120,7 +123,7 @@ function repo_get {
     notice "repo_get"
     
     get_github 'openresty' 'memc-nginx-module.git'
-    get_github 'chaoslawful' 'lua-nginx-module.git'
+    get_github 'openresty' 'lua-nginx-module.git'
     get_github 'simplresty' 'ngx_devel_kit.git'
     get_github 'openresty' 'redis2-nginx-module.git'
     get_github 'openresty' 'echo-nginx-module.git'
@@ -143,6 +146,7 @@ function repo_get {
             make -j4
             make install
         fi
+        ldconfig
     popd
     
     get_github 'openresty' 'replace-filter-nginx-module.git'
@@ -150,8 +154,10 @@ function repo_get {
     
     if [ ! -f drizzle7-2011.07.21.tar.gz ]; then
         wget https://agentzh.org/misc/nginx/drizzle7-2011.07.21.tar.gz
-        tar xf drizzle7-2011.07.21.tar.gz
     fi
+    
+    tar xf drizzle7-2011.07.21.tar.gz
+    
     pushd 'drizzle7-2011.07.21'
         rm -rf build ; mkdir build
         
@@ -163,8 +169,10 @@ function repo_get {
         
         make libdrizzle-1.0 -j4
         make install-libdrizzle-1.0 -j4
+        ldconfig
     popd
     
+    get_github 'openresty' 'rds-json-nginx-module.git'
     get_github 'openresty' 'ngx_postgres.git'
 }
 
@@ -174,14 +182,28 @@ function luajit2_git_prepare {
     
     notice "luajit2_git_prepare"
     
+    if [ $IS_LOCAL == 1 ]; then
+        mkdir opt ; cd opt
+    else
+        cd /opt
+    fi
+    
     get_github 'openresty' 'luajit2.git'
     pushd 'luajit2.git'
+        
         make clean
         mkdir build
         
-        make -j4 PREFIX=$PARENTF/luajit2.git/build
-        make install PREFIX=$PARENTF/luajit2.git/build
+        if [ $IS_LOCAL == 1 ]; then
+            make -j4 PREFIX=$PARENTF/opt/luajit2.git/build
+            make install PREFIX=$PARENTF/opt/luajit2.git/build
+        else
+            make -j4 PREFIX=/opt/luajit2.git/build
+            make install PREFIX=/opt/luajit2.git/build
+        fi
     popd
+    
+    cd $PARENTF
 }
 
 # ------------------------------------------------------------------------------
@@ -189,7 +211,14 @@ function luajit2_git_prepare {
 function lua_addition_prepare {
     
     notice "lua_addition_prepare"
-    local folderName=''
+    
+    
+    local LUAJIT2_SRC=""
+    if [ $IS_LOCAL == 1 ]; then
+        LUAJIT2_SRC="$PARENTF/opt/luajit2.git/src"
+    else
+        LUAJIT2_SRC="/opt/luajit2.git/src"
+    fi
     
     if [ $IS_LOCAL == 1 ]; then
         mkdir opt ; cd opt
@@ -203,9 +232,9 @@ function lua_addition_prepare {
     
     pushd 'lua-cjson.git'
         echo
-        echo "export LUA_INCLUDE_DIR=\"$PARENTF/luajit2.git/src\" && make -j4"
+        echo "export LUA_INCLUDE_DIR=\"$LUAJIT2_SRC\" && make -j4"
         echo
-        export LUA_INCLUDE_DIR="$PARENTF/luajit2.git/src" && make -j4
+        export LUA_INCLUDE_DIR="$LUAJIT2_SRC" && make -j4
         
         read -p "Press [Enter] key to continue..."
     popd
@@ -230,6 +259,40 @@ function lua_addition_prepare {
     cd $PARENTF
 }
 
+
+# ------------------------------------------------------------------------------
+
+function openssl_get {
+    
+    notice "openssl_get"
+    
+    rm -rf openssl-OpenSSL_1_1_1d
+    
+    if [ ! -f OpenSSL_1_1_1d.tar.gz ]; then
+        wget https://github.com/openssl/openssl/archive/OpenSSL_1_1_1d.tar.gz
+    fi
+    
+    tar xf OpenSSL_1_1_1d.tar.gz
+}
+
+# ------------------------------------------------------------------------------
+
+function openssl_generate_localhost {
+    
+    notice "openssl_generate_localhost"
+    
+    if [ ! -f "/etc/$NGINXV/ssl/localhost.crt" ]; then
+        
+        pushd "/etc/$NGINXV/"
+            mkdir ssl ; cd ssl
+            
+            openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout localhost.key -out localhost.crt
+            openssl dhparam -out dhparam.pem 4096
+            
+            cd ..
+        popd
+    fi
+}
 
 # ------------------------------------------------------------------------------
 
@@ -262,6 +325,8 @@ function make_configure {
     local FASTCGI_TEMP_PATH=""
     local UWSGI_TEMP_PATH=""
     local SCGI_TEMP_PATH=""
+    local LUAJIT2_BUILD_LIB=""
+    local LUAJIT2_SRC=""
     
     if [ $IS_LOCAL == 1 ]; then
         mkdir -p $PARENTF/build/{tmp,proxy,fastcgi,uwsgi,scgi}
@@ -275,6 +340,8 @@ function make_configure {
         FASTCGI_TEMP_PATH="$PREFIX/fastcgi/"
         UWSGI_TEMP_PATH="$PREFIX/uwsgi/"
         SCGI_TEMP_PATH="$PREFIX/scgi/"
+        LUAJIT2_BUILD_LIB="$PARENTF/opt/luajit2.git/build/lib"
+        LUAJIT2_SRC="$PARENTF/opt/luajit2.git/src"
     else
         PREFIX="/usr/local/$NGINXV"
         CONF_PATH="/etc/$NGINXV/nginx.conf"
@@ -286,6 +353,13 @@ function make_configure {
         FASTCGI_TEMP_PATH="/var/lib/nginx/fastcgi/"
         UWSGI_TEMP_PATH="/var/lib/nginx/uwsgi/"
         SCGI_TEMP_PATH="/var/lib/nginx/scgi/"
+        LUAJIT2_BUILD_LIB="/opt/luajit2.git/build/lib"
+        LUAJIT2_SRC="/opt/luajit2.git/src"
+    fi
+    
+    WITH_OPENSSL=""
+    if [ -d openssl-OpenSSL_1_1_1d ]; then
+        WITH_OPENSSL="--with-openssl=$PARENTF/openssl-OpenSSL_1_1_1d --with-openssl-opt='enable-tls1_3'"
     fi
     
     
@@ -294,7 +368,7 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 
 ./configure \\
 --with-cc-opt="-Wno-sign-compare -Wno-string-plus-int -Wno-deprecated-declarations -Wno-unused-parameter -Wno-unused-const-variable -Wno-conditional-uninitialized -Wno-mismatched-tags -Wno-sometimes-uninitialized -Wno-parentheses-equality -Wno-tautological-compare -Wno-self-assign -Wno-deprecated-register -Wno-deprecated -Wno-invalid-source-encoding -Wno-pointer-sign -Wno-parentheses -Wno-enum-conversion -Wno-c++11-compat-deprecated-writable-strings -Wno-write-strings" \\
---with-ld-opt="-Wl,-rpath,../luajit2.git/build/lib" \\
+--with-ld-opt="-Wl,-rpath,$LUAJIT2_BUILD_LIB" \\
 --prefix=$PREFIX \\
 --conf-path=$CONF_PATH \\
 --pid-path=$PID_PATH \\
@@ -309,7 +383,7 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --group=nginx \\
 --with-http_v2_module \\
 --with-file-aio \\
---with-http_ssl_module \\
+--with-http_ssl_module $WITH_OPENSSL \\
 --with-http_realip_module \\
 --with-http_addition_module \\
 --with-http_image_filter_module \\
@@ -334,6 +408,7 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --add-module=../headers-more-nginx-module.git/ \\
 --add-module=../naxsi.git/naxsi_src/ \\
 --add-module=../replace-filter-nginx-module.git/ \\
+--add-module=../rds-json-nginx-module.git/ \\
 --add-module=../drizzle-nginx-module.git/ \\
 --add-module=../ngx_postgres.git/ \\
 
@@ -346,7 +421,8 @@ L10HEREDOC
     echo "unset SREGEX_LIB && unset SREGEX_INC"
     echo "unset LIBDRIZZLE_INC && unset LIBDRIZZLE_LIB"
     echo
-    echo "export LUAJIT_LIB=../luajit2.git/build/lib && export LUAJIT_INC=../luajit2.git/src"
+    echo "export LUAJIT_LIB=$LUAJIT2_BUILD_LIB && export LUAJIT_INC=$LUAJIT2_SRC"
+    
     if [ $IS_LOCAL == 1 ]; then
         echo "export SREGEX_LIB=../sregex.git/build/lib && export SREGEX_INC=../sregex.git/src"
         echo "export LIBDRIZZLE_INC=../drizzle7-2011.07.21/build/include/libdrizzle-1.0 && export LIBDRIZZLE_LIB=../drizzle7-2011.07.21/build/lib64/"
@@ -419,6 +495,25 @@ L12HEREDOC
 
 # ------------------------------------------------------------------------------
 
+function get_github {
+    notice "https://github.com/$1/$2"
+    local folderName=$2
+    
+    if [ -d $folderName ]; then
+        cd $folderName
+        pwd
+        git pull
+        cd ..
+    else
+        git clone https://github.com/$1/$folderName $folderName
+    fi
+    pushd $folderName
+        git describe --tags --abbrev=0
+    popd
+}
+
+# ------------------------------------------------------------------------------
+
 function notice {
     builtin echo -en "\033[1m"
     echo "NOTICE: $@"
@@ -449,23 +544,6 @@ function fatal {
     echo "FATAL: $@"
     builtin echo -en "\033[0m"
     exit 1
-}
-
-function get_github {
-    notice "github.com/$1/$2"
-    local folderName=$2
-    
-    if [ -d $folderName ]; then
-        cd $folderName
-        pwd
-        git pull
-        cd ..
-    else
-        git clone https://github.com/$1/$folderName $folderName
-    fi
-    pushd $folderName
-        git describe --tags --abbrev=0
-    popd
 }
 
 # ------------------------------------------------------------------------------
