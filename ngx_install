@@ -13,12 +13,12 @@ main() {
     notice "from parent folder $PARENTF"
     notice "IS_LOCAL $IS_LOCAL"
     
-    pushd 'luajit2.git'
+    pushd 'opt/luajit2.git'
         mkdir build
         
         notice 'make luajit2.git'
         make -j2
-        make install PREFIX=$PARENTF/luajit2.git/build
+        make install PREFIX=$PARENTF/opt/luajit2.git/build
     popd
     
     pushd 'sregex.git'
@@ -53,9 +53,9 @@ main() {
         notice 'make opt/lua-cjson.git'
         
         echo
-        echo "export LUA_INCLUDE_DIR=\"$PARENTF/luajit2.git/src\" && make -j4"
+        echo "export LUA_INCLUDE_DIR=\"$PARENTF/opt/luajit2.git/src\" && make -j4"
         echo
-        export LUA_INCLUDE_DIR="$PARENTF/luajit2.git/src" && make -j4
+        export LUA_INCLUDE_DIR="$PARENTF/opt/luajit2.git/src" && make -j4
         
         read -p "Press [Enter] key to continue..."
     popd
