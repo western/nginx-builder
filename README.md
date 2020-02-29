@@ -63,6 +63,12 @@ v0.01rc3
 
 * OpenSSL 1.1.1d
 
+## generate ssl keys
+
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout localhost.key -out localhost.crt
+
+openssl dhparam -out dhparam.pem 4096
+
 ## synopsis
 * download release of package
 * unpack
