@@ -26,7 +26,7 @@ function main {
     #make_configure
     #make_service
     #make_run_schedule
-    #prepare_for_archive
+    prepare_for_archive
 }
 
 # ------------------------------------------------------------------------------
@@ -67,11 +67,6 @@ function prepare_for_archive {
         rm -rf build ; mkdir build
         make clean
     popd
-    pushd 'drizzle7-2011.07.21'
-        warn `pwd`
-        rm -rf build ; mkdir build
-        make clean
-    popd
     pushd 'opt/lua-cjson.git'
         warn `pwd`
         make clean
@@ -80,6 +75,12 @@ function prepare_for_archive {
     
     rm -rf $NGINXV
     tar xf $NGINXV.tar.gz
+    
+    rm -rf drizzle7-2011.07.21
+    tar xf drizzle7-2011.07.21.tar.gz
+    
+    rm -rf openssl-OpenSSL_1_1_1d
+    tar xf OpenSSL_1_1_1d.tar.gz
 }
 
 # ------------------------------------------------------------------------------
@@ -101,6 +102,54 @@ function root_prepare {
         warn 'openSUSE Leap 15.1 detected.'
         zypper in -t pattern -y devel_C_C++ devel_basis devel_perl console
         zypper in -y pcre-devel libopenssl-devel gd-devel libGeoIP-devel libatomic_ops-devel dialog
+    fi
+    
+    if cat /etc/*release* | grep -q 'VERSION="9 (stretch)"'; then
+        warn 'debian 9 detected.'
+        apt-get install -y vim mc less mlocate git cmake build-essential curl gnupg aptitude
+        apt-get install -y libpq-dev libpcre3-dev zlib1g-dev libgd-dev libgeoip-dev libatomic-ops-dev
+    fi
+    
+    if cat /etc/*release* | grep -q 'VERSION="10 (buster)"'; then
+        warn 'debian 10 detected.'
+        apt-get install -y vim mc less mlocate git cmake build-essential curl gnupg aptitude
+        apt-get install -y libpq-dev libpcre3-dev zlib1g-dev libgd-dev libgeoip-dev libatomic-ops-dev
+    fi
+    
+    if cat /etc/*release* | grep -q 'CentOS Linux release 7'; then
+        warn 'CentOS 7 detected.'
+
+        yum install dnf -y
+        dnf install wget -y
+        dnf groupinstall "Development Tools" -y
+
+        dnf install python2 -y
+        dnf install pcre-devel -y
+        dnf install zlib-devel -y
+        dnf install gd-devel -y
+        dnf install openssl-devel -y
+
+        dnf install epel-release -y
+        dnf install GeoIP-devel -y
+        dnf install libatomic_ops-devel -y
+    fi
+    
+    if cat /etc/*release* | grep -q 'CentOS Linux release 8'; then
+        warn 'CentOS 8 detected.'
+        
+        dnf groupinstall "Development Tools" -y
+        dnf config-manager --set-enabled PowerTools
+        dnf install python2 -y
+        dnf install pcre-devel -y
+        dnf install zlib-devel -y
+        dnf install gd-devel -y
+        dnf install openssl-devel -y
+
+        dnf install epel-release -y
+        dnf install GeoIP-devel -y
+        dnf install libatomic_ops-devel -y
+        
+        ln -s /usr/bin/python2 /usr/bin/python
     fi
     
     if [ $IS_LOCAL == 0 ]; then
@@ -153,7 +202,7 @@ function repo_get {
     get_github 'openresty' 'drizzle-nginx-module.git'
     
     if [ ! -f drizzle7-2011.07.21.tar.gz ]; then
-        wget https://agentzh.org/misc/nginx/drizzle7-2011.07.21.tar.gz
+        wget https://openresty.org/download/drizzle7-2011.07.21.tar.gz
     fi
     
     tar xf drizzle7-2011.07.21.tar.gz
