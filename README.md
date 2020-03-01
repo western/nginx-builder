@@ -72,5 +72,4 @@ openssl dhparam -out dhparam.pem 4096
 ## synopsis
 * download release of package
 * unpack
-* edit ngx_install script for IS_LOCAL variable
 * run ./ngx_install
