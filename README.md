@@ -8,14 +8,14 @@ based on https://gist.github.com/western/c04efe49745f24874c43
 
 * github.com/openresty/memc-nginx-module.git
 v0.19
-* github.com/chaoslawful/lua-nginx-module.git
-v0.10.15
+* github.com/openresty/lua-nginx-module.git
+v0.10.16rc4
 * github.com/simplresty/ngx_devel_kit.git
 v0.3.1
 * github.com/openresty/redis2-nginx-module.git
 v0.15
 * github.com/openresty/echo-nginx-module.git
-v0.61
+v0.62rc1
 * github.com/calio/form-input-nginx-module.git
 v0.12
 * github.com/openresty/set-misc-nginx-module.git
@@ -37,31 +37,28 @@ v0.1.11
 * https://agentzh.org/misc/nginx/drizzle7-2011.07.21.tar.gz
 drizzle7-2011.07.21.tar.gz
 * github.com/openresty/rds-json-nginx-module.git
-0.15
+v0.15
 * github.com/openresty/ngx_postgres.git
 1.0
-* github.com/openssl/openssl.git
-1.1.1d
 * github.com/openresty/luajit2.git
-v2.1-20190912
+v2.1-20200102
 * github.com/openresty/lua-resty-core.git
-v0.1.17
+v0.1.18rc1
 * github.com/openresty/lua-resty-lrucache.git
-v0.09
+v0.10rc1
 * github.com/openresty/lua-cjson.git
 2.1.0.7
 * github.com/openresty/lua-resty-redis.git
-v0.27
+v0.28rc1
 * github.com/cloudflare/lua-resty-cookie.git
 v0.1.0
 * github.com/openresty/lua-resty-mysql.git
 v0.21
 * github.com/openresty/lua-ssl-nginx-module.git
 v0.01rc3
+* github.com/openssl/openssl/archive/OpenSSL_1_1_1d.tar.gz
+1_1_1d
 
-## new modules
-
-* OpenSSL 1.1.1d
 
 ## generate ssl keys
 
