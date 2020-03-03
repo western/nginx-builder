@@ -3,6 +3,11 @@ Latest Nginx with steroids
 
 based on https://gist.github.com/western/c04efe49745f24874c43
 
+## synopsis
+* download release of package https://github.com/western/nginx-builder/releases
+* tar xf nginx-builder-0.5.2.tar.gz
+* ./ngx_install
+
 ## fixed versions
 * nginx 1.16.1
 
@@ -68,7 +73,3 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout localhost.key -out l
 
 openssl dhparam -out dhparam.pem 4096
 
-## synopsis
-* download release of package https://github.com/western/nginx-builder/releases
-* unpack
-* run ./ngx_install
