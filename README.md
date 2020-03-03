@@ -57,16 +57,18 @@ v0.21
 * github.com/openresty/lua-ssl-nginx-module.git
 v0.01rc3
 * github.com/openssl/openssl/archive/OpenSSL_1_1_1d.tar.gz
-1_1_1d
+1.1.1d
 
 
 ## generate ssl keys
 
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout localhost.key -out localhost.crt
 
+### make Diffie Hellman key
+
 openssl dhparam -out dhparam.pem 4096
 
 ## synopsis
-* download release of package
+* download release of package https://github.com/western/nginx-builder/releases
 * unpack
 * run ./ngx_install
