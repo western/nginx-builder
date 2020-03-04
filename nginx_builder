@@ -17,15 +17,22 @@ function main {
         warn "run for LOCAL operations"
     fi
     
+    rm versions
+    
     #root_prepare
+    #postgres_get
+    
     repo_get
     luajit2_git_prepare
     lua_addition_prepare
     openssl_get
     nginx_get
     #make_configure
-    #make_service
-    #make_run_schedule
+    
+    #make_nginx_service
+    #make_postgres_service
+    #make_nginx_tmpfile
+    
     prepare_for_archive
 }
 
@@ -37,8 +44,8 @@ function prepare_for_archive {
     
     for mfold in echo-nginx-module.git form-input-nginx-module.git headers-more-nginx-module.git \
         lua-nginx-module.git memc-nginx-module.git naxsi.git sregex.git \
-        replace-filter-nginx-module.git drizzle-nginx-module.git rds-json-nginx-module.git \
-        ngx_postgres.git nginx-upload-module.git ngx_cache_purge.git ngx_devel_kit.git \
+        replace-filter-nginx-module.git drizzle-nginx-module.git rds-json-nginx-module.git rds-csv-nginx-module.git \
+        ngx_postgres.git stream-lua-nginx-module.git njs.git nginx-upload-module.git ngx_cache_purge.git ngx_devel_kit.git \
         redis2-nginx-module.git set-misc-nginx-module.git
     do
         warn "remove [$mfold/.git] folder"
@@ -105,13 +112,13 @@ function root_prepare {
     fi
     
     if cat /etc/*release* | grep -q 'VERSION="9 (stretch)"'; then
-        warn 'debian 9 detected.'
+        warn 'Debian 9 detected.'
         apt-get install -y vim mc less mlocate git cmake build-essential curl gnupg aptitude
         apt-get install -y libpq-dev libpcre3-dev zlib1g-dev libgd-dev libgeoip-dev libatomic-ops-dev
     fi
     
     if cat /etc/*release* | grep -q 'VERSION="10 (buster)"'; then
-        warn 'debian 10 detected.'
+        warn 'Debian 10 detected.'
         apt-get install -y vim mc less mlocate git cmake build-essential curl gnupg aptitude
         apt-get install -y libpq-dev libpcre3-dev zlib1g-dev libgd-dev libgeoip-dev libatomic-ops-dev
     fi
@@ -163,6 +170,86 @@ function root_prepare {
 
         mkdir /var/log/nginx/
     fi
+}
+
+# ------------------------------------------------------------------------------
+
+function postgres_get {
+    
+    notice "postgres_get"
+    
+    local POSTGRESV="postgresql-12.2"
+    local PREFIX=""
+    local DATADIR=""
+    
+    
+    if [ $IS_LOCAL == 1 ]; then
+        PREFIX="$PARENTF/pgsql-12.2"
+        DATADIR="$PARENTF/pgsql-12.2/data"
+        
+        rm -rf $PREFIX
+        
+    else
+        PREFIX="/usr/local/pgsql-12.2"
+        DATADIR="/data/pgsql-12.2"
+        
+        rm -rf $PREFIX
+        
+        if ! grep -q "postgres" /etc/passwd; then
+            groupadd postgres
+            useradd -M -g postgres postgres   
+        fi
+        
+        mkdir -p $DATADIR
+        chown postgres:postgres $DATADIR
+    fi
+    
+    if [ ! -f $POSTGRESV.tar.gz ]; then
+        wget "https://ftp.postgresql.org/pub/source/v12.2/$POSTGRESV.tar.gz"
+    fi
+    
+    tar xf $POSTGRESV.tar.gz
+    
+    pushd $POSTGRESV
+        ./configure --prefix=$PREFIX && make install -j4
+    popd
+    
+    notice "PREFIX" $PREFIX
+    notice "DATADIR" $DATADIR
+    
+    if [ $IS_LOCAL == 1 ]; then
+        notice "$PREFIX/bin/initdb -D $DATADIR"
+        $PREFIX/bin/initdb -D $DATADIR
+        notice "$PREFIX/bin/pg_ctl -D $DATADIR -l logfile start"
+        $PREFIX/bin/pg_ctl -D $DATADIR -l logfile start
+        notice "$PREFIX/bin/createdb -E Unicode test"
+        $PREFIX/bin/createdb -E Unicode test
+        
+        notice "$PREFIX/bin/createuser test"
+        $PREFIX/bin/createuser test
+        notice "$PREFIX/bin/psql -c \"alter user test with encrypted password 'test';\""
+        $PREFIX/bin/psql -c "alter user test with encrypted password 'test';"
+        
+        notice "$PREFIX/bin/pg_ctl -D $DATADIR -l logfile stop"
+        $PREFIX/bin/pg_ctl -D $DATADIR -l logfile stop
+    else
+        notice "$PREFIX/bin/initdb -D $DATADIR"
+        su postgres -c "$PREFIX/bin/initdb -D $DATADIR"
+        notice "$PREFIX/bin/pg_ctl -D $DATADIR -l /tmp/logfile1 start"
+        su postgres -c "$PREFIX/bin/pg_ctl -D $DATADIR -l /tmp/logfile1 start"
+        notice "$PREFIX/bin/createdb -E Unicode test"
+        su postgres -c "$PREFIX/bin/createdb -E Unicode test"
+        
+        notice "$PREFIX/bin/createuser test"
+        su postgres -c "$PREFIX/bin/createuser test"
+        notice "$PREFIX/bin/psql -c \"alter user test with encrypted password 'test';\""
+        su postgres -c "$PREFIX/bin/psql -c \"alter user test with encrypted password 'test';\""
+        
+        notice "$PREFIX/bin/pg_ctl -D $DATADIR -l /tmp/logfile1 stop"
+        su postgres -c "$PREFIX/bin/pg_ctl -D $DATADIR -l /tmp/logfile1 stop"
+    fi
+    
+    
 }
 
 # ------------------------------------------------------------------------------
@@ -222,7 +309,10 @@ function repo_get {
     popd
     
     get_github 'openresty' 'rds-json-nginx-module.git'
+    get_github 'openresty' 'rds-csv-nginx-module.git'
     get_github 'openresty' 'ngx_postgres.git'
+    get_github 'openresty' 'stream-lua-nginx-module.git'
+    get_github 'nginx' 'njs.git'
 }
 
 # ------------------------------------------------------------------------------
@@ -307,7 +397,6 @@ function lua_addition_prepare {
     
     cd $PARENTF
 }
-
 
 # ------------------------------------------------------------------------------
 
@@ -430,14 +519,20 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --http-scgi-temp-path=$SCGI_TEMP_PATH \\
 --user=nginx \\
 --group=nginx \\
---with-http_v2_module \\
+--with-stream \\
+--with-stream_ssl_module \\
+--with-stream_ssl_preread_module \\
+--with-threads \\
 --with-file-aio \\
 --with-http_ssl_module $WITH_OPENSSL \\
+--with-http_v2_module \\
 --with-http_realip_module \\
 --with-http_addition_module \\
 --with-http_image_filter_module \\
 --with-http_geoip_module \\
 --with-http_sub_module \\
+--with-http_mp4_module \\
+--with-http_gunzip_module \\
 --with-http_gzip_static_module \\
 --with-http_random_index_module \\
 --with-http_secure_link_module \\
@@ -458,8 +553,11 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --add-module=../naxsi.git/naxsi_src/ \\
 --add-module=../replace-filter-nginx-module.git/ \\
 --add-module=../rds-json-nginx-module.git/ \\
+--add-module=../rds-csv-nginx-module.git/ \\
 --add-module=../drizzle-nginx-module.git/ \\
 --add-module=../ngx_postgres.git/ \\
+--add-module=../stream-lua-nginx-module.git/ \\
+--add-module=../njs.git/nginx/ \\
 
 L10HEREDOC
     
@@ -487,9 +585,9 @@ L10HEREDOC
 
 # ------------------------------------------------------------------------------
 
-function make_service {
+function make_nginx_service {
     
-    notice "make_service"
+    notice "make_nginx_service"
     
     if ! whoami | grep -q root; then
         echo 'root required. exit.'
@@ -525,9 +623,81 @@ L11HEREDOC
 
 # ------------------------------------------------------------------------------
 
-function make_run_schedule {
+function make_postgres_service {
     
-    notice "make_run_schedule"
+    notice "make_postgres_service"
+    
+    if ! whoami | grep -q root; then
+        echo 'root required. exit.'
+        exit 1
+    fi
+    
+    local PREFIX=""
+    local DATADIR=""
+    
+    if [ $IS_LOCAL == 1 ]; then
+        PREFIX="$PARENTF/pgsql-12.2"
+        DATADIR="$PARENTF/pgsql-12.2/data"
+    else
+        PREFIX="/usr/local/pgsql-12.2"
+        DATADIR="/data/pgsql-12.2"
+    fi
+
+cat << L13HEREDOC > /usr/lib/systemd/system/postgresql122.service
+
+[Unit]
+Description=PostgreSQL 12.2 database server
+After=network.target
+
+[Service]
+Type=forking
+
+User=postgres
+Group=postgres
+
+# Where to send early-startup messages from the server (before the logging
+# options of postgresql.conf take effect)
+# This is normally controlled by the global default set by systemd
+# StandardOutput=syslog
+
+# Disable OOM kill on the postmaster
+OOMScoreAdjust=-1000
+# ... but allow it still to be effective for child processes
+# (note that these settings are ignored by Postgres releases before 9.5)
+Environment=PG_OOM_ADJUST_FILE=/proc/self/oom_score_adj
+Environment=PG_OOM_ADJUST_VALUE=0
+
+# Maximum number of seconds pg_ctl will wait for postgres to start.  Note that
+# PGSTARTTIMEOUT should be less than TimeoutSec value.
+Environment=PGSTARTTIMEOUT=270
+
+Environment=PGDATA=$DATADIR
+
+
+ExecStart=$PREFIX/bin/pg_ctl start -D \${PGDATA} -s -w -t \${PGSTARTTIMEOUT}
+ExecStop=$PREFIX/bin/pg_ctl stop -D \${PGDATA} -s -m fast
+ExecReload=$PREFIX/bin/pg_ctl reload -D \${PGDATA} -s
+
+# Give a reasonable amount of time for the server to start up/shut down.
+# Ideally, the timeout for starting PostgreSQL server should be handled more
+# nicely by pg_ctl in ExecStart, so keep its timeout smaller than this value.
+TimeoutSec=300
+
+[Install]
+WantedBy=multi-user.target
+
+L13HEREDOC
+
+    systemctl daemon-reload
+    systemctl status postgresql122.service
+    systemctl enable postgresql122.service
+}
+
+# ------------------------------------------------------------------------------
+
+function make_nginx_tmpfile {
+    
+    notice "make_nginx_tmpfile"
     
     if ! whoami | grep -q root; then
         echo 'root required. exit.'
@@ -556,8 +726,12 @@ function get_github {
     else
         git clone https://github.com/$1/$folderName $folderName
     fi
+    
+    echo "https://github.com/$1/$folderName" >> "$PARENTF/versions"
+    
     pushd $folderName
         git describe --tags --abbrev=0
+        echo `git describe --tags --abbrev=0` >> "$PARENTF/versions"
     popd
 }
 
