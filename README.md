@@ -8,19 +8,15 @@ based on https://gist.github.com/western/c04efe49745f24874c43
 * tar xf nginx-builder-0.5.2.tar.gz
 * ./ngx_install
 
+## new
+
+* rds-csv-nginx-module
+* stream-lua-nginx-module
+* njs
+
 ## fixed versions
 * nginx 1.16.1
 
-* github.com/openresty/memc-nginx-module.git
-v0.19
-* github.com/openresty/lua-nginx-module.git
-v0.10.16rc4
-* github.com/simplresty/ngx_devel_kit.git
-v0.3.1
-* github.com/openresty/redis2-nginx-module.git
-v0.15
-* github.com/openresty/echo-nginx-module.git
-v0.62rc1
 * github.com/calio/form-input-nginx-module.git
 v0.12
 * github.com/openresty/set-misc-nginx-module.git
@@ -39,12 +35,16 @@ v0.0.1
 v0.01rc5
 * github.com/openresty/drizzle-nginx-module.git
 v0.1.11
-* https://agentzh.org/misc/nginx/drizzle7-2011.07.21.tar.gz
-drizzle7-2011.07.21.tar.gz
 * github.com/openresty/rds-json-nginx-module.git
 v0.15
+* github.com/openresty/rds-csv-nginx-module.git
+v0.09
 * github.com/openresty/ngx_postgres.git
 1.0
+* github.com/openresty/stream-lua-nginx-module.git
+v0.0.8rc2
+* github.com/nginx/njs.git
+0.3.9
 * github.com/openresty/luajit2.git
 v2.1-20200102
 * github.com/openresty/lua-resty-core.git
@@ -61,9 +61,10 @@ v0.1.0
 v0.21
 * github.com/openresty/lua-ssl-nginx-module.git
 v0.01rc3
+* openresty.org/download/drizzle7-2011.07.21.tar.gz
+drizzle7-2011.07.21.tar.gz
 * github.com/openssl/openssl/archive/OpenSSL_1_1_1d.tar.gz
 1.1.1d
-
 
 ## generate ssl keys
 
