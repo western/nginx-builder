@@ -5,7 +5,7 @@ based on https://gist.github.com/western/c04efe49745f24874c43
 
 ## synopsis
 * download release of package https://github.com/western/nginx-builder/releases
-* tar xf nginx-builder-0.5.2.tar.gz
+* tar xf nginx-builder-x.x.tar.gz
 * ./ngx_install
 
 ## new
