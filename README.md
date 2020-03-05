@@ -1,9 +1,11 @@
-# nginx-builder
+# Further than nginx
+
 Latest Nginx with steroids
 
 based on https://gist.github.com/western/c04efe49745f24874c43
 
 ## synopsis
+
 * download release of package https://github.com/western/nginx-builder/releases
 * tar xf nginx-builder-x.x.tar.gz
 * ./ngx_install
@@ -14,7 +16,14 @@ based on https://gist.github.com/western/c04efe49745f24874c43
 * njs
 
 ## fixed versions
+
 * nginx 1.16.1
+* openresty.org/download/drizzle7-2011.07.21.tar.gz
+drizzle7-2011.07.21.tar.gz
+* github.com/openssl/openssl/archive/OpenSSL_1_1_1d.tar.gz
+1.1.1d
+
+## modules
 
 * github.com/calio/form-input-nginx-module.git
 v0.12
@@ -40,8 +49,6 @@ v0.15
 v0.09
 * github.com/openresty/ngx_postgres.git
 1.0
-* github.com/openresty/stream-lua-nginx-module.git
-v0.0.8rc2
 * github.com/nginx/njs.git
 0.3.9
 * github.com/openresty/luajit2.git
@@ -60,10 +67,6 @@ v0.1.0
 v0.21
 * github.com/openresty/lua-ssl-nginx-module.git
 v0.01rc3
-* openresty.org/download/drizzle7-2011.07.21.tar.gz
-drizzle7-2011.07.21.tar.gz
-* github.com/openssl/openssl/archive/OpenSSL_1_1_1d.tar.gz
-1.1.1d
 
 ## generate ssl keys
 
