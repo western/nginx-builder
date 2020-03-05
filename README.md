@@ -11,7 +11,6 @@ based on https://gist.github.com/western/c04efe49745f24874c43
 ## new
 
 * rds-csv-nginx-module
-* stream-lua-nginx-module
 * njs
 
 ## fixed versions
