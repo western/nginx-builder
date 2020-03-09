@@ -133,14 +133,20 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --http-scgi-temp-path=$SCGI_TEMP_PATH \\
 --user=nginx \\
 --group=nginx \\
---with-http_v2_module \\
+--with-stream \\
+--with-stream_ssl_module \\
+--with-stream_ssl_preread_module \\
+--with-threads \\
 --with-file-aio \\
 --with-http_ssl_module $WITH_OPENSSL \\
+--with-http_v2_module \\
 --with-http_realip_module \\
 --with-http_addition_module \\
 --with-http_image_filter_module \\
 --with-http_geoip_module \\
 --with-http_sub_module \\
+--with-http_mp4_module \\
+--with-http_gunzip_module \\
 --with-http_gzip_static_module \\
 --with-http_random_index_module \\
 --with-http_secure_link_module \\
