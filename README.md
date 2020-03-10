@@ -10,11 +10,6 @@ based on https://gist.github.com/western/c04efe49745f24874c43
 * tar xf nginx-builder-x.x.tar.gz
 * ./ngx_install
 
-## new
-
-* rds-csv-nginx-module
-* njs
-
 ## fixed versions
 
 * nginx 1.16.1
