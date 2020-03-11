@@ -18,6 +18,12 @@ drizzle7-2011.07.21.tar.gz
 * github.com/openssl/openssl/archive/OpenSSL_1_1_1d.tar.gz
 1.1.1d
 
+## new
+
+* lua-resty-signal
+* lua-tablepool
+* lua-resty-shell
+
 ## modules
 
 * github.com/openresty/memc-nginx-module.git
@@ -80,12 +86,6 @@ v0.02
 v0.01
 * github.com/openresty/lua-resty-shell.git
 v0.03rc1
-
-## new
-
-* lua-resty-signal
-* lua-tablepool
-* lua-resty-shell
 
 ## generate ssl keys
 
