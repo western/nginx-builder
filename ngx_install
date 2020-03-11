@@ -60,6 +60,40 @@ main() {
         read -p "Press [Enter] key to continue..."
     popd
     
+    echo
+    notice "save these strings:"
+    if [ $IS_LOCAL == 1 ]; then
+        local LB="$PARENTF/opt/lua-resty-core.git/lib/?.lua;"
+        LB="$LB$PARENTF/opt/lua-resty-lrucache.git/lib/?.lua;"
+        LB="$LB$PARENTF/opt/lua-resty-redis.git/lib/?.lua;"
+        LB="$LB$PARENTF/opt/lua-resty-mysql.git/lib/?.lua;"
+        LB="$LB$PARENTF/opt/lua-ssl-nginx-module.git/lib/?.lua;"
+        
+        LB="$LB$PARENTF/opt/lua-resty-signal.git/lib/?.lua;"
+        LB="$LB$PARENTF/opt/lua-tablepool.git/lib/?.lua;"
+        LB="$LB$PARENTF/opt/lua-resty-shell.git/lib/?.lua;"
+        
+        local CLB="$PARENTF/opt/lua-cjson.git/?.so;"
+        CLB="$CLB$PARENTF/opt/lua-resty-signal.git/?.so;"
+        
+        echo "lua_package_path \"$LB;\";"
+        echo "lua_package_cpath \"$CLB;\";"
+    else
+        local LB="/opt/lua-resty-core.git/lib/?.lua;"
+        LB="$LB/opt/lua-resty-lrucache.git/lib/?.lua;"
+        LB="$LB/opt/lua-resty-redis.git/lib/?.lua;"
+        LB="$LB/opt/lua-resty-mysql.git/lib/?.lua;"
+        LB="$LB/opt/lua-ssl-nginx-module.git/lib/?.lua;"
+        
+        local CLB="/opt/lua-cjson.git/?.so;"
+        CLB="$CLB/opt/lua-resty-signal.git/?.so;"
+        
+        echo "lua_package_path \"$LB;\";"
+        echo "lua_package_cpath \"$CLB;\";"
+    fi
+    echo
+    read -p "Press [Enter] key to continue..."
+    
     make_configure
     
 }
