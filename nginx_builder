@@ -45,7 +45,7 @@ function prepare_for_archive {
     for mfold in echo-nginx-module.git form-input-nginx-module.git headers-more-nginx-module.git \
         lua-nginx-module.git memc-nginx-module.git naxsi.git sregex.git \
         replace-filter-nginx-module.git drizzle-nginx-module.git rds-json-nginx-module.git rds-csv-nginx-module.git \
-        ngx_postgres.git stream-lua-nginx-module.git njs.git nginx-upload-module.git ngx_cache_purge.git ngx_devel_kit.git \
+        ngx_postgres.git njs.git stream-lua-nginx-module.git nginx-upload-module.git ngx_cache_purge.git ngx_devel_kit.git \
         redis2-nginx-module.git set-misc-nginx-module.git
     do
         warn "remove [$mfold/.git] folder"
@@ -56,6 +56,7 @@ function prepare_for_archive {
         pushd 'opt'
             for mfold in lua-cjson.git lua-resty-cookie.git lua-resty-core.git lua-resty-lrucache.git \
                 lua-resty-mysql.git lua-resty-redis.git lua-ssl-nginx-module.git \
+                lua-resty-signal.git lua-tablepool.git lua-resty-shell.git \
                 luajit2.git
             do
                 warn "remove [$mfold/.git] folder"
@@ -311,8 +312,9 @@ function repo_get {
     get_github 'openresty' 'rds-json-nginx-module.git'
     get_github 'openresty' 'rds-csv-nginx-module.git'
     get_github 'openresty' 'ngx_postgres.git'
-    get_github 'openresty' 'stream-lua-nginx-module.git'
     get_github 'nginx' 'njs.git'
+    
+    get_github 'openresty' 'stream-lua-nginx-module.git' 'v0.0.7'
 }
 
 # ------------------------------------------------------------------------------
@@ -352,13 +354,6 @@ function lua_addition_prepare {
     notice "lua_addition_prepare"
     
     
-    local LUAJIT2_SRC=""
-    if [ $IS_LOCAL == 1 ]; then
-        LUAJIT2_SRC="$PARENTF/opt/luajit2.git/src"
-    else
-        LUAJIT2_SRC="/opt/luajit2.git/src"
-    fi
-    
     if [ $IS_LOCAL == 1 ]; then
         mkdir opt ; cd opt
     else
@@ -368,6 +363,13 @@ function lua_addition_prepare {
     get_github 'openresty' 'lua-resty-core.git'
     get_github 'openresty' 'lua-resty-lrucache.git'
     get_github 'openresty' 'lua-cjson.git'
+    
+    local LUAJIT2_SRC=""
+    if [ $IS_LOCAL == 1 ]; then
+        LUAJIT2_SRC="$PARENTF/opt/luajit2.git/src"
+    else
+        LUAJIT2_SRC="/opt/luajit2.git/src"
+    fi
     
     pushd 'lua-cjson.git'
         echo
@@ -383,14 +385,40 @@ function lua_addition_prepare {
     get_github 'openresty' 'lua-resty-mysql.git'
     get_github 'openresty' 'lua-ssl-nginx-module.git'
     
+    get_github 'openresty' 'lua-resty-signal.git'
+    get_github 'openresty' 'lua-tablepool.git'
+    get_github 'openresty' 'lua-resty-shell.git'
+    
     echo
     notice "save these strings:"
     if [ $IS_LOCAL == 1 ]; then
-        echo "lua_package_path \"$PARENTF/opt/lua-resty-core.git/lib/?.lua;$PARENTF/opt/lua-resty-lrucache.git/lib/?.lua;$PARENTF/opt/lua-resty-redis.git/lib/?.lua;$PARENTF/opt/lua-resty-mysql.git/lib/?.lua;$PARENTF/opt/lua-ssl-nginx-module.git/lib/?.lua;;\";"
-        echo "lua_package_cpath \"$PARENTF/opt/lua-cjson.git/?.so;;\";"
+        local LB="$PARENTF/opt/lua-resty-core.git/lib/?.lua;"
+        LB="$LB$PARENTF/opt/lua-resty-lrucache.git/lib/?.lua;"
+        LB="$LB$PARENTF/opt/lua-resty-redis.git/lib/?.lua;"
+        LB="$LB$PARENTF/opt/lua-resty-mysql.git/lib/?.lua;"
+        LB="$LB$PARENTF/opt/lua-ssl-nginx-module.git/lib/?.lua;"
+        
+        LB="$LB$PARENTF/opt/lua-resty-signal.git/lib/?.lua;"
+        LB="$LB$PARENTF/opt/lua-tablepool.git/lib/?.lua;"
+        LB="$LB$PARENTF/opt/lua-resty-shell.git/lib/?.lua;"
+        
+        local CLB="$PARENTF/opt/lua-cjson.git/?.so;"
+        CLB="$CLB$PARENTF/opt/lua-resty-signal.git/?.so;"
+        
+        echo "lua_package_path \"$LB;\";"
+        echo "lua_package_cpath \"$CLB;\";"
     else
-        echo "lua_package_path \"/opt/lua-resty-core.git/lib/?.lua;/opt/lua-resty-lrucache.git/lib/?.lua;/opt/lua-resty-redis.git/lib/?.lua;/opt/lua-resty-mysql.git/lib/?.lua;/opt/lua-ssl-nginx-module.git/lib/?.lua;;\";"
-        echo "lua_package_cpath \"/opt/lua-cjson.git/?.so;;\";"
+        local LB="/opt/lua-resty-core.git/lib/?.lua;"
+        LB="$LB/opt/lua-resty-lrucache.git/lib/?.lua;"
+        LB="$LB/opt/lua-resty-redis.git/lib/?.lua;"
+        LB="$LB/opt/lua-resty-mysql.git/lib/?.lua;"
+        LB="$LB/opt/lua-ssl-nginx-module.git/lib/?.lua;"
+        
+        local CLB="/opt/lua-cjson.git/?.so;"
+        CLB="$CLB/opt/lua-resty-signal.git/?.so;"
+        
+        echo "lua_package_path \"$LB;\";"
+        echo "lua_package_cpath \"$CLB;\";"
     fi
     echo
     read -p "Press [Enter] key to continue..."
@@ -556,8 +584,8 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --add-module=../rds-csv-nginx-module.git/ \\
 --add-module=../drizzle-nginx-module.git/ \\
 --add-module=../ngx_postgres.git/ \\
---add-module=../stream-lua-nginx-module.git/ \\
 --add-module=../njs.git/nginx/ \\
+--add-module=../stream-lua-nginx-module.git/ \\
 
 L10HEREDOC
     
@@ -717,6 +745,7 @@ L12HEREDOC
 function get_github {
     notice "https://github.com/$1/$2"
     local folderName=$2
+    local branch=$3
     
     if [ -d $folderName ]; then
         cd $folderName
@@ -724,7 +753,12 @@ function get_github {
         git pull
         cd ..
     else
-        git clone https://github.com/$1/$folderName $folderName
+        if [ "$branch" == "" ]; then
+            git clone https://github.com/$1/$folderName $folderName
+        else
+            notice "branch $branch"
+            git clone -b $branch https://github.com/$1/$folderName $folderName
+        fi
     fi
     
     echo "https://github.com/$1/$folderName" >> "$PARENTF/versions"
