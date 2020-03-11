@@ -20,9 +20,13 @@ drizzle7-2011.07.21.tar.gz
 
 ## new
 
-* lua-resty-signal
-* lua-tablepool
-* lua-resty-shell
+* xss-nginx-module
+* lua-resty-limit-traffic
+* lua-resty-lock
+* lua-resty-string
+* lua-resty-upload
+* lua-resty-websocket
+* lua-resty-upstream-healthcheck
 
 ## modules
 
@@ -64,6 +68,8 @@ v0.09
 0.3.9
 * github.com/openresty/stream-lua-nginx-module.git
 v0.0.7
+* github.com/openresty/xss-nginx-module.git
+v0.06
 * github.com/openresty/luajit2.git
 v2.1-20200102
 * github.com/openresty/lua-resty-core.git
@@ -86,6 +92,18 @@ v0.02
 v0.01
 * github.com/openresty/lua-resty-shell.git
 v0.03rc1
+* github.com/openresty/lua-resty-limit-traffic.git
+v0.06
+* github.com/openresty/lua-resty-lock.git
+v0.08
+* github.com/openresty/lua-resty-string.git
+v0.12rc1
+* github.com/openresty/lua-resty-upload.git
+v0.10
+* github.com/openresty/lua-resty-websocket.git
+v0.07
+* github.com/openresty/lua-resty-upstream-healthcheck.git
+v0.06
 
 ## generate ssl keys
 
