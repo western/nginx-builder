@@ -45,7 +45,8 @@ function prepare_for_archive {
     for mfold in echo-nginx-module.git form-input-nginx-module.git headers-more-nginx-module.git \
         lua-nginx-module.git memc-nginx-module.git naxsi.git sregex.git \
         replace-filter-nginx-module.git drizzle-nginx-module.git rds-json-nginx-module.git rds-csv-nginx-module.git \
-        ngx_postgres.git njs.git stream-lua-nginx-module.git nginx-upload-module.git ngx_cache_purge.git ngx_devel_kit.git \
+        ngx_postgres.git njs.git stream-lua-nginx-module.git xss-nginx-module.git \
+        nginx-upload-module.git ngx_cache_purge.git ngx_devel_kit.git \
         redis2-nginx-module.git set-misc-nginx-module.git
     do
         warn "remove [$mfold/.git] folder"
@@ -57,6 +58,8 @@ function prepare_for_archive {
             for mfold in lua-cjson.git lua-resty-cookie.git lua-resty-core.git lua-resty-lrucache.git \
                 lua-resty-mysql.git lua-resty-redis.git lua-ssl-nginx-module.git \
                 lua-resty-signal.git lua-tablepool.git lua-resty-shell.git \
+                lua-resty-limit-traffic.git lua-resty-lock.git lua-resty-string.git lua-resty-upload.git \
+                lua-resty-websocket.git lua-resty-upstream-healthcheck.git \
                 luajit2.git
             do
                 warn "remove [$mfold/.git] folder"
@@ -315,6 +318,8 @@ function repo_get {
     get_github 'nginx' 'njs.git'
     
     get_github 'openresty' 'stream-lua-nginx-module.git' 'v0.0.7'
+    get_github 'openresty' 'xss-nginx-module.git'
+    
 }
 
 # ------------------------------------------------------------------------------
@@ -388,6 +393,13 @@ function lua_addition_prepare {
     get_github 'openresty' 'lua-resty-signal.git'
     get_github 'openresty' 'lua-tablepool.git'
     get_github 'openresty' 'lua-resty-shell.git'
+    
+    get_github 'openresty' 'lua-resty-limit-traffic.git'
+    get_github 'openresty' 'lua-resty-lock.git'
+    get_github 'openresty' 'lua-resty-string.git'
+    get_github 'openresty' 'lua-resty-upload.git'
+    get_github 'openresty' 'lua-resty-websocket.git'
+    get_github 'openresty' 'lua-resty-upstream-healthcheck.git'
     
     echo
     notice "save these strings:"
@@ -586,6 +598,7 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --add-module=../ngx_postgres.git/ \\
 --add-module=../njs.git/nginx/ \\
 --add-module=../stream-lua-nginx-module.git/ \\
+--add-module=../xss-nginx-module.git/ \\
 
 L10HEREDOC
     
