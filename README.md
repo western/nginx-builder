@@ -27,7 +27,7 @@ drizzle7-2011.07.21.tar.gz
 * github.com/openresty/memc-nginx-module.git
 v0.19
 * github.com/openresty/lua-nginx-module.git
-v0.10.16rc5
+v0.10.15
 * github.com/simplresty/ngx_devel_kit.git
 v0.3.1
 * github.com/openresty/redis2-nginx-module.git
@@ -69,9 +69,9 @@ v1.2.1
 * github.com/openresty/luajit2.git
 v2.1-20200102
 * github.com/openresty/lua-resty-core.git
-v0.1.18rc4
+v0.1.17
 * github.com/openresty/lua-resty-lrucache.git
-v0.10rc1
+v0.09
 * github.com/openresty/lua-cjson.git
 2.1.0.7
 * github.com/openresty/lua-resty-redis.git
