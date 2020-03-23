@@ -9,7 +9,7 @@ use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 2 + 16);
+plan tests => repeat_each() * (blocks() * 2 + 15);
 
 #no_diff();
 no_long_string();
@@ -1129,33 +1129,27 @@ failed to match
 
 
 
-=== TEST 48: init_by_lua_block
+=== TEST 48: init_by_lua
 --- http_config
-    init_by_lua_block {
-        local m, err = ngx.re.match("hello, 1234", [[(\d+)]])
-        if not m then
-            ngx.log(ngx.ERR, "failed to match: ", err)
-        else
-            package.loaded.m = m
-        end
-    }
+    init_by_lua '
+        package.loaded.m = ngx.re.match("hello, 1234", "(\\\\d+)")
+    ';
 --- config
     location /re {
-        content_by_lua_block {
+        content_by_lua '
             local m = package.loaded.m
             if m then
                 ngx.say(m[0])
             else
                 ngx.say("not matched!")
             end
-        }
+        ';
     }
 --- request
     GET /re
 --- response_body
 1234
---- no_error_log
-[error]
+--- SKIP
 
 
 

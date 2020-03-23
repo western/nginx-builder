@@ -16,6 +16,8 @@
 #include "ngx_http_lua_common.h"
 
 
+#ifndef NGX_LUA_NO_FFI_API
+
 #ifdef NGX_HTTP_LUA_USE_OCSP
 static int ngx_http_lua_ssl_empty_status_callback(ngx_ssl_conn_t *ssl_conn,
     void *data);
@@ -497,6 +499,8 @@ ngx_http_lua_ffi_ssl_set_ocsp_status_resp(ngx_http_request_t *r,
 
 #endif  /* NGX_HTTP_LUA_USE_OCSP */
 }
+
+#endif  /* NGX_LUA_NO_FFI_API */
 
 
 #endif  /* NGX_HTTP_SSL */

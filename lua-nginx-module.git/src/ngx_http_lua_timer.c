@@ -16,9 +16,6 @@
 #include "ngx_http_lua_probe.h"
 
 
-#define NGX_HTTP_LUA_TIMER_ERRBUF_SIZE  128
-
-
 typedef struct {
     void        **main_conf;
     void        **srv_conf;
@@ -562,19 +559,11 @@ ngx_http_lua_timer_handler(ngx_event_t *ev)
     ngx_http_lua_main_conf_t        *lmcf;
     ngx_http_core_loc_conf_t        *clcf;
 
-    lua_Debug                ar;
-    u_char                  *p;
-    u_char                   errbuf[NGX_HTTP_LUA_TIMER_ERRBUF_SIZE];
-    const char              *source;
-    const char              *errmsg;
-
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, ngx_cycle->log, 0,
                    "lua ngx.timer expired");
 
     ngx_memcpy(&tctx, ev->data, sizeof(ngx_http_lua_timer_ctx_t));
     ngx_free(ev);
-
-    ngx_http_lua_assert(tctx.co_ref && tctx.co);
 
     lmcf = tctx.lmcf;
 
@@ -590,17 +579,17 @@ ngx_http_lua_timer_handler(ngx_event_t *ev)
     }
 
     if (lmcf->running_timers >= lmcf->max_running_timers) {
-        p = ngx_snprintf(errbuf, NGX_HTTP_LUA_TIMER_ERRBUF_SIZE - 1,
-                         "%i lua_max_running_timers are not enough",
-                         lmcf->max_running_timers);
-        *p = '\0';
-        errmsg = (const char *) errbuf;
+        ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
+                      "%i lua_max_running_timers are not enough",
+                      lmcf->max_running_timers);
         goto failed;
     }
 
     c = ngx_http_lua_create_fake_connection(tctx.pool);
     if (c == NULL) {
-        errmsg = "could not create fake connection";
+        ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
+                      "failed to create fake connection to run timer (co: %p)",
+                      tctx.co);
         goto failed;
     }
 
@@ -612,7 +601,9 @@ ngx_http_lua_timer_handler(ngx_event_t *ev)
 
     r = ngx_http_lua_create_fake_request(c);
     if (r == NULL) {
-        errmsg = "could not create fake request";
+        ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
+                      "failed to create fake request to run timer (co: %p)",
+                      tctx.co);
         goto failed;
     }
 
@@ -622,18 +613,34 @@ ngx_http_lua_timer_handler(ngx_event_t *ev)
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 
-#if (nginx_version >= 1009000)
+#if defined(nginx_version) && nginx_version >= 1003014
+
+#   if nginx_version >= 1009000
+
     ngx_set_connection_log(r->connection, clcf->error_log);
 
-#else
+#   else
+
     ngx_http_set_connection_log(r->connection, clcf->error_log);
+
+#   endif
+
+#else
+
+    c->log->file = clcf->error_log->file;
+
+    if (!(c->log->log_level & NGX_LOG_DEBUG_CONNECTION)) {
+        c->log->log_level = clcf->error_log->log_level;
+    }
+
 #endif
 
     dd("lmcf: %p", lmcf);
 
     ctx = ngx_http_lua_create_ctx(r);
     if (ctx == NULL) {
-        errmsg = "could not create ctx";
+        ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
+                      "failed to create ctx to run timer (co: %p)", tctx.co);
         goto failed;
     }
 
@@ -642,7 +649,9 @@ ngx_http_lua_timer_handler(ngx_event_t *ev)
 
         pcln = ngx_pool_cleanup_add(r->pool, 0);
         if (pcln == NULL) {
-            errmsg = "could not add vm cleanup";
+            ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
+                          "failed to add vm cleanup to run timer (co: %p)",
+                          tctx.co);
             goto failed;
         }
 
@@ -656,7 +665,9 @@ ngx_http_lua_timer_handler(ngx_event_t *ev)
 
     cln = ngx_http_cleanup_add(r, 0);
     if (cln == NULL) {
-        errmsg = "could not add request cleanup";
+        ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
+                      "failed to add request cleanup to run timer (co: %p)",
+                      tctx.co);
         goto failed;
     }
 
@@ -713,24 +724,13 @@ ngx_http_lua_timer_handler(ngx_event_t *ev)
 
 failed:
 
-    /* co stack: func [args] */
-    lua_getinfo(tctx.co, ">Sf", &ar);
-
-    source = ar.source;
-
-    if (source == NULL) {
-        source = "(unknown)";
+    if (tctx.co_ref && tctx.co) {
+        lua_pushlightuserdata(tctx.co, ngx_http_lua_lightudata_mask(
+                              coroutines_key));
+        lua_rawget(tctx.co, LUA_REGISTRYINDEX);
+        luaL_unref(tctx.co, -1, tctx.co_ref);
+        lua_settop(tctx.co, 0);
     }
-
-    ngx_log_error(NGX_LOG_ALERT, ngx_cycle->log, 0,
-                  "lua failed to run timer with function defined at %s:%d: %s",
-                  source, ar.linedefined, errmsg);
-
-    lua_pushlightuserdata(tctx.co, ngx_http_lua_lightudata_mask(
-                          coroutines_key));
-    lua_rawget(tctx.co, LUA_REGISTRYINDEX);
-    luaL_unref(tctx.co, -1, tctx.co_ref);
-    lua_settop(tctx.co, 0);
 
     if (tctx.vm_state) {
         ngx_http_lua_cleanup_vm(tctx.vm_state);

@@ -194,7 +194,7 @@ log_wrapper(ngx_log_t *log, const char *ident, ngx_uint_t level,
     *p++ = ':';
 
     p = ngx_snprintf(p, NGX_INT_T_LEN, "%d",
-                     ar.currentline > 0 ? ar.currentline : ar.linedefined);
+                     ar.currentline ? ar.currentline : ar.linedefined);
 
     *p++ = ':'; *p++ = ' ';
 
@@ -340,6 +340,7 @@ ngx_http_lua_capture_log_handler(ngx_log_t *log,
 #endif
 
 
+#ifndef NGX_LUA_NO_FFI_API
 int
 ngx_http_lua_ffi_errlog_set_filter_level(int level, u_char *err, size_t *errlen)
 {
@@ -450,5 +451,6 @@ ngx_http_lua_ffi_raw_log(ngx_http_request_t *r, int level, u_char *s,
     return NGX_OK;
 }
 
+#endif
 
 /* vi:set ft=c ts=4 sw=4 et fdm=marker: */

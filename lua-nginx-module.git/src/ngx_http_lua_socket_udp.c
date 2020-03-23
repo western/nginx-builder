@@ -63,7 +63,7 @@ static void ngx_http_lua_udp_socket_cleanup(void *data);
 
 enum {
     SOCKET_CTX_INDEX = 1,
-    SOCKET_TIMEOUT_INDEX = 2,
+    SOCKET_TIMEOUT_INDEX = 2
 };
 
 
@@ -143,8 +143,7 @@ ngx_http_lua_socket_udp(lua_State *L)
                                | NGX_HTTP_LUA_CONTEXT_ACCESS
                                | NGX_HTTP_LUA_CONTEXT_CONTENT
                                | NGX_HTTP_LUA_CONTEXT_TIMER
-                               | NGX_HTTP_LUA_CONTEXT_SSL_CERT
-                               | NGX_HTTP_LUA_CONTEXT_SSL_SESS_FETCH);
+                               | NGX_HTTP_LUA_CONTEXT_SSL_CERT);
 
     lua_createtable(L, 3 /* narr */, 1 /* nrec */);
     lua_pushlightuserdata(L, ngx_http_lua_lightudata_mask(
@@ -206,8 +205,7 @@ ngx_http_lua_socket_udp_setpeername(lua_State *L)
                                | NGX_HTTP_LUA_CONTEXT_ACCESS
                                | NGX_HTTP_LUA_CONTEXT_CONTENT
                                | NGX_HTTP_LUA_CONTEXT_TIMER
-                               | NGX_HTTP_LUA_CONTEXT_SSL_CERT
-                               | NGX_HTTP_LUA_CONTEXT_SSL_SESS_FETCH);
+                               | NGX_HTTP_LUA_CONTEXT_SSL_CERT);
 
     luaL_checktype(L, 1, LUA_TTABLE);
 
@@ -369,6 +367,9 @@ ngx_http_lua_socket_udp_setpeername(lua_State *L)
     }
 
     rctx->name = host;
+#if !defined(nginx_version) || nginx_version < 1005008
+    rctx->type = NGX_RESOLVE_A;
+#endif
     rctx->handler = ngx_http_lua_socket_resolve_handler;
     rctx->data = u;
     rctx->timeout = clcf->resolver_timeout;
@@ -436,8 +437,12 @@ ngx_http_lua_socket_resolve_handler(ngx_resolver_ctx_t *ctx)
     ngx_http_lua_socket_udp_upstream_t  *u;
     u_char                              *p;
     size_t                               len;
+#if defined(nginx_version) && nginx_version >= 1005008
     socklen_t                            socklen;
     struct sockaddr                     *sockaddr;
+#else
+    struct sockaddr_in                  *sin;
+#endif
     ngx_uint_t                           i;
     unsigned                             waiting;
 
@@ -497,20 +502,36 @@ ngx_http_lua_socket_resolve_handler(ngx_resolver_ctx_t *ctx)
 
 #if (NGX_DEBUG)
     {
-        u_char      text[NGX_SOCKADDR_STRLEN];
-        ngx_str_t   addr;
-        ngx_uint_t  i;
+#   if defined(nginx_version) && nginx_version >= 1005008
+    u_char      text[NGX_SOCKADDR_STRLEN];
+    ngx_str_t   addr;
+#   else
+    in_addr_t   addr;
+#   endif
+    ngx_uint_t  i;
 
-        addr.data = text;
+#   if defined(nginx_version) && nginx_version >= 1005008
+    addr.data = text;
 
-        for (i = 0; i < ctx->naddrs; i++) {
-            addr.len = ngx_sock_ntop(ur->addrs[i].sockaddr,
-                                     ur->addrs[i].socklen, text,
-                                     NGX_SOCKADDR_STRLEN, 0);
+    for (i = 0; i < ctx->naddrs; i++) {
+        addr.len = ngx_sock_ntop(ur->addrs[i].sockaddr, ur->addrs[i].socklen,
+                                 text, NGX_SOCKADDR_STRLEN, 0);
 
-            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                           "name was resolved to %V", &addr);
-        }
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                       "name was resolved to %V", &addr);
+    }
+#   else
+    for (i = 0; i < ctx->naddrs; i++) {
+        dd("addr i: %d %p", (int) i,  &ctx->addrs[i]);
+
+        addr = ntohl(ctx->addrs[i]);
+
+        ngx_log_debug4(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                       "name was resolved to %ud.%ud.%ud.%ud",
+                       (addr >> 24) & 0xff, (addr >> 16) & 0xff,
+                       (addr >> 8) & 0xff, addr & 0xff);
+    }
+#   endif
     }
 #endif
 
@@ -525,6 +546,7 @@ ngx_http_lua_socket_resolve_handler(ngx_resolver_ctx_t *ctx)
 
     dd("selected addr index: %d", (int) i);
 
+#if defined(nginx_version) && nginx_version >= 1005008
     socklen = ur->addrs[i].socklen;
 
     sockaddr = ngx_palloc(r->pool, socklen);
@@ -552,6 +574,30 @@ ngx_http_lua_socket_resolve_handler(ngx_resolver_ctx_t *ctx)
     len = ngx_sock_ntop(sockaddr, socklen, p, NGX_SOCKADDR_STRLEN, 1);
     ur->sockaddr = sockaddr;
     ur->socklen = socklen;
+
+#else
+    /* for nginx older than 1.5.8 */
+
+    len = NGX_INET_ADDRSTRLEN + sizeof(":65535") - 1;
+
+    p = ngx_pnalloc(r->pool, len + sizeof(struct sockaddr_in));
+    if (p == NULL) {
+        goto nomem;
+    }
+
+    sin = (struct sockaddr_in *) &p[len];
+    ngx_memzero(sin, sizeof(struct sockaddr_in));
+
+    len = ngx_inet_ntop(AF_INET, &ur->addrs[i], p, NGX_INET_ADDRSTRLEN);
+    len = ngx_sprintf(&p[len], ":%d", ur->port) - p;
+
+    sin->sin_family = AF_INET;
+    sin->sin_port = htons(ur->port);
+    sin->sin_addr.s_addr = ur->addrs[i];
+
+    ur->sockaddr = (struct sockaddr *) sin;
+    ur->socklen = sizeof(struct sockaddr_in);
+#endif
 
     ur->host.data = p;
     ur->host.len = len;
@@ -717,7 +763,11 @@ ngx_http_lua_socket_error_retval_handler(ngx_http_request_t *r,
     } else {
 
         if (u->socket_errno) {
+#if defined(nginx_version) && nginx_version >= 9000
             p = ngx_strerror(u->socket_errno, errstr, sizeof(errstr));
+#else
+            p = ngx_strerror_r(u->socket_errno, errstr, sizeof(errstr));
+#endif
             /* for compatibility with LuaSocket */
             ngx_strlow(errstr, errstr, p - errstr);
             lua_pushlstring(L, (char *) errstr, p - errstr);

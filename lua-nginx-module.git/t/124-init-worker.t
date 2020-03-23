@@ -791,10 +791,6 @@ lua close the global Lua VM \1
 lua close the global Lua VM \2 in the cache helper process \d+
 lua close the global Lua VM \2
 lua close the global Lua VM \2
-|lua close the global Lua VM ([0-9A-F]+)
-lua close the global Lua VM \3 in the cache helper process \d+
-lua close the global Lua VM \3
-lua close the global Lua VM \3 in the cache helper process \d+
 )(?:lua close the global Lua VM [0-9A-F]+
 )*\z/
 --- no_error_log
@@ -833,10 +829,6 @@ lua close the global Lua VM \1
 lua close the global Lua VM \2 in the cache helper process \d+
 lua close the global Lua VM \2
 lua close the global Lua VM \2
-|lua close the global Lua VM ([0-9A-F]+)
-lua close the global Lua VM \3 in the cache helper process \d+
-lua close the global Lua VM \3
-lua close the global Lua VM \3 in the cache helper process \d+
 )(?:lua close the global Lua VM [0-9A-F]+
 )*\z/
 --- no_error_log
@@ -876,10 +868,6 @@ lua close the global Lua VM \1
 lua close the global Lua VM \2 in the cache helper process \d+
 lua close the global Lua VM \2
 lua close the global Lua VM \2
-|lua close the global Lua VM ([0-9A-F]+)
-lua close the global Lua VM \3 in the cache helper process \d+
-lua close the global Lua VM \3
-lua close the global Lua VM \3 in the cache helper process \d+
 )(?:lua close the global Lua VM [0-9A-F]+
 )*\z/
 --- error_log eval
