@@ -67,7 +67,7 @@ main() {
         LB="$LB$PARENTF/opt/lua-resty-lrucache.git/lib/?.lua;"
         LB="$LB$PARENTF/opt/lua-resty-redis.git/lib/?.lua;"
         LB="$LB$PARENTF/opt/lua-resty-mysql.git/lib/?.lua;"
-        LB="$LB$PARENTF/opt/lua-ssl-nginx-module.git/lib/?.lua;"
+        LB="$LB$PARENTF/opt/lua-ssl-nginx-module.git/lualib/?.lua;"
         
         LB="$LB$PARENTF/opt/lua-resty-signal.git/lib/?.lua;"
         LB="$LB$PARENTF/opt/lua-tablepool.git/lib/?.lua;"
@@ -78,18 +78,26 @@ main() {
         
         echo "lua_package_path \"$LB;\";"
         echo "lua_package_cpath \"$CLB;\";"
+        echo "lua_package_path \"$LB;\";" > "$PARENTF/lua_package_path"
+        echo "lua_package_cpath \"$CLB;\";" >> "$PARENTF/lua_package_path"
     else
         local LB="/opt/lua-resty-core.git/lib/?.lua;"
         LB="$LB/opt/lua-resty-lrucache.git/lib/?.lua;"
         LB="$LB/opt/lua-resty-redis.git/lib/?.lua;"
         LB="$LB/opt/lua-resty-mysql.git/lib/?.lua;"
-        LB="$LB/opt/lua-ssl-nginx-module.git/lib/?.lua;"
+        LB="$LB/opt/lua-ssl-nginx-module.git/lualib/?.lua;"
+        
+        LB="$LB/opt/lua-resty-signal.git/lib/?.lua;"
+        LB="$LB/opt/lua-tablepool.git/lib/?.lua;"
+        LB="$LB/opt/lua-resty-shell.git/lib/?.lua;"
         
         local CLB="/opt/lua-cjson.git/?.so;"
         CLB="$CLB/opt/lua-resty-signal.git/?.so;"
         
         echo "lua_package_path \"$LB;\";"
         echo "lua_package_cpath \"$CLB;\";"
+        echo "lua_package_path \"$LB;\";" > "$PARENTF/lua_package_path"
+        echo "lua_package_cpath \"$CLB;\";" >> "$PARENTF/lua_package_path"
     fi
     echo
     read -p "Press [Enter] key to continue..."
