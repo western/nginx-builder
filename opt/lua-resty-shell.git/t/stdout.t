@@ -183,4 +183,3 @@ reason: failed to wait for process: timeout
 status: nil
 --- error_log
 lua pipe SIGCHLD fd read pid:
---- wait: 0.2
