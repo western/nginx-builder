@@ -263,7 +263,7 @@ function repo_get {
     notice "repo_get"
     
     get_github 'openresty' 'memc-nginx-module.git'
-    get_github 'openresty' 'lua-nginx-module.git'
+    get_github 'openresty' 'lua-nginx-module.git' 'v0.10.15'
     get_github 'simplresty' 'ngx_devel_kit.git'
     get_github 'openresty' 'redis2-nginx-module.git'
     get_github 'openresty' 'echo-nginx-module.git'
@@ -366,10 +366,9 @@ function lua_addition_prepare {
         cd /opt
     fi
     
-    #get_github 'openresty' 'lua-resty-core.git' 'v0.1.17'
-    get_github 'openresty' 'lua-resty-core.git'
-    get_github 'openresty' 'lua-resty-lrucache.git'
-    get_github 'openresty' 'lua-cjson.git'
+    get_github 'openresty' 'lua-resty-core.git' 'v0.1.17'
+    get_github 'openresty' 'lua-resty-lrucache.git' 'v0.09'
+    get_github 'openresty' 'lua-cjson.git' '2.1.0.7'
     
     local LUAJIT2_SRC=""
     if [ $IS_LOCAL == 1 ]; then
@@ -427,6 +426,8 @@ function lua_addition_prepare {
         
         echo "lua_package_path \"$LB;\";"
         echo "lua_package_cpath \"$CLB;\";"
+        echo "lua_package_path \"$LB;\";" > "$PARENTF/lua_package_path"
+        echo "lua_package_cpath \"$CLB;\";" >> "$PARENTF/lua_package_path"
     else
         local LB="/opt/lua-resty-core.git/lib/?.lua;"
         LB="$LB/opt/lua-resty-lrucache.git/lib/?.lua;"
@@ -443,6 +444,8 @@ function lua_addition_prepare {
         
         echo "lua_package_path \"$LB;\";"
         echo "lua_package_cpath \"$CLB;\";"
+        echo "lua_package_path \"$LB;\";" > "$PARENTF/lua_package_path"
+        echo "lua_package_cpath \"$CLB;\";" >> "$PARENTF/lua_package_path"
     fi
     echo
     
