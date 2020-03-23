@@ -6,6 +6,8 @@
 
 #include <njs_main.h>
 
+#include "njs_externals_test.h"
+
 #include <string.h>
 #include <stdlib.h>
 #include <sys/resource.h>
@@ -31,15 +33,16 @@ static njs_int_t
 njs_benchmark_test(njs_vm_t *parent, njs_opts_t *opts, njs_value_t *report,
     njs_benchmark_test_t *test)
 {
-    u_char        *start;
-    njs_vm_t      *vm, *nvm;
-    uint64_t      us;
-    njs_int_t     ret;
-    njs_str_t     s, *expected;
-    njs_uint_t    i, n;
-    njs_bool_t    success;
-    njs_value_t   *result, name, usec, times;
-    njs_vm_opt_t  options;
+    u_char                *start;
+    njs_vm_t              *vm, *nvm;
+    uint64_t              us;
+    njs_int_t             ret;
+    njs_str_t             s, *expected;
+    njs_uint_t            i, n;
+    njs_bool_t            success;
+    njs_value_t           *result, name, usec, times;
+    njs_vm_opt_t          options;
+    njs_external_proto_t  proto;
 
     static const njs_value_t  name_key = njs_string("name");
     static const njs_value_t  usec_key = njs_string("usec");
@@ -62,6 +65,11 @@ njs_benchmark_test(njs_vm_t *parent, njs_opts_t *opts, njs_value_t *report,
     ret = njs_vm_compile(vm, &start, start + test->script.length);
     if (ret != NJS_OK) {
         njs_printf("njs_vm_compile() failed\n");
+        goto done;
+    }
+
+    proto = njs_externals_shared_init(vm);
+    if (proto == NULL) {
         goto done;
     }
 
@@ -212,6 +220,27 @@ static njs_benchmark_test_t  njs_test[] =
       njs_str("3524578"),
       1 },
 
+    { "array 64k keys",
+      njs_str("var arr = new Array(2**16);"
+              "arr.fill(1);"
+              "Object.keys(arr)[0]"),
+      njs_str("0"),
+      10 },
+
+    { "array 64k values",
+      njs_str("var arr = new Array(2**16);"
+              "arr.fill(1);"
+              "Object.values(arr)[0]"),
+      njs_str("1"),
+      10 },
+
+    { "array 64k entries",
+      njs_str("var arr = new Array(2**16);"
+              "arr.fill(1);"
+              "Object.entries(arr)[0][0]"),
+      njs_str("0"),
+      10 },
+
     { "array 1M",
       njs_str("var arr = new Array(1000000);"
               "var count = 0, length = arr.length;"
@@ -229,6 +258,26 @@ static njs_benchmark_test_t  njs_test[] =
               "count"),
       njs_str("20000000"),
       1 },
+
+    { "external property ($shared.uri)",
+      njs_str("$shared.uri"),
+      njs_str("shared"),
+      1000 },
+
+    { "external object property ($shared.props.a)",
+      njs_str("$shared.props.a"),
+      njs_str("4294967295"),
+      1000 },
+
+    { "external dump (JSON.stringify($shared.header))",
+      njs_str("JSON.stringify($shared.header)"),
+      njs_str("{\"01\":\"01|АБВ\",\"02\":\"02|АБВ\",\"03\":\"03|АБВ\"}"),
+      1000 },
+
+    { "external method ($shared.method('YES'))",
+      njs_str("$shared.method('YES')"),
+      njs_str("shared"),
+      1000 },
 };
 
 

@@ -10,6 +10,8 @@
 #include <sys/resource.h>
 #include <time.h>
 
+#include "njs_externals_test.h"
+
 
 typedef struct {
     njs_str_t  script;
@@ -183,6 +185,11 @@ static njs_interactive_test_t  njs_test[] =
                  "    at eval (native)\n"
                  "    at main (native)\n") },
 
+    { njs_str("$r.method({}.a.a)" ENTER),
+      njs_str("TypeError: cannot get property \"a\" of undefined\n"
+                 "    at $r3.method (native)\n"
+                 "    at main (native)\n") },
+
     { njs_str("new Function(\n\n@)" ENTER),
       njs_str("SyntaxError: Unexpected token \"@\" in 3") },
 
@@ -318,6 +325,11 @@ njs_interactive_test(njs_bool_t verbose)
         vm = njs_vm_create(&options);
         if (vm == NULL) {
             njs_printf("njs_vm_create() failed\n");
+            goto done;
+        }
+
+        ret = njs_externals_init(vm, NULL);
+        if (ret != NJS_OK) {
             goto done;
         }
 
