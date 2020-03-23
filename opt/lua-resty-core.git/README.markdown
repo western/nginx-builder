@@ -50,16 +50,6 @@ This library is production ready.
 Synopsis
 ========
 
-This library is automatically loaded by default in OpenResty 1.15.8.1. This
-behavior can be disabled via the
-[lua_load_resty_core](https://github.com/openresty/lua-nginx-module#lua_load_resty_core)
-directive, but note that the use of this library is vividly recommended, as its
-FFI implementation is both faster, safer, and more complete than the Lua C API
-of the ngx_lua module.
-
-If you are using an older version of OpenResty, you must load this library like
-so:
-
 ```nginx
     # nginx.conf
 
@@ -107,8 +97,8 @@ of this library in the particular OpenResty release you are using. Otherwise you
 into serious compatibility issues.
 
 * LuaJIT 2.1 (for now, it is the v2.1 git branch in the official luajit-2.0 git repository: http://luajit.org/download.html )
-* [ngx_http_lua_module](https://github.com/openresty/lua-nginx-module) v0.10.16.
-* [ngx_stream_lua_module](https://github.com/openresty/lua-nginx-module) v0.0.8.
+* [ngx_http_lua_module](https://github.com/openresty/lua-nginx-module) v0.10.15.
+* [ngx_stream_lua_module](https://github.com/openresty/lua-nginx-module) v0.0.6.
 * [lua-resty-lrucache](https://github.com/openresty/lua-resty-lrucache)
 
 [Back to TOC](#table-of-contents)

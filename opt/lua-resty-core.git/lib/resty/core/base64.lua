@@ -1,28 +1,21 @@
 -- Copyright (C) Yichun Zhang (agentzh)
 
 
-local ffi = require "ffi"
+local ffi = require 'ffi'
 local base = require "resty.core.base"
 
-
-local C = ffi.C
 local ffi_string = ffi.string
+local C = ffi.C
 local ngx = ngx
 local type = type
-local error = error
-local floor = math.floor
 local tostring = tostring
+local error = error
 local get_string_buf = base.get_string_buf
 local get_size_ptr = base.get_size_ptr
-local subsystem = ngx.config.subsystem
+local floor = math.floor
 
 
-local ngx_lua_ffi_encode_base64
-local ngx_lua_ffi_decode_base64
-
-
-if subsystem == "http" then
-    ffi.cdef[[
+ffi.cdef[[
     size_t ngx_http_lua_ffi_encode_base64(const unsigned char *src,
                                           size_t len, unsigned char *dst,
                                           int no_padding);
@@ -30,25 +23,7 @@ if subsystem == "http" then
     int ngx_http_lua_ffi_decode_base64(const unsigned char *src,
                                        size_t len, unsigned char *dst,
                                        size_t *dlen);
-    ]]
-
-    ngx_lua_ffi_encode_base64 = C.ngx_http_lua_ffi_encode_base64
-    ngx_lua_ffi_decode_base64 = C.ngx_http_lua_ffi_decode_base64
-
-elseif subsystem == "stream" then
-    ffi.cdef[[
-    size_t ngx_stream_lua_ffi_encode_base64(const unsigned char *src,
-                                            size_t len, unsigned char *dst,
-                                            int no_padding);
-
-    int ngx_stream_lua_ffi_decode_base64(const unsigned char *src,
-                                         size_t len, unsigned char *dst,
-                                         size_t *dlen);
-    ]]
-
-    ngx_lua_ffi_encode_base64 = C.ngx_stream_lua_ffi_encode_base64
-    ngx_lua_ffi_decode_base64 = C.ngx_stream_lua_ffi_decode_base64
-end
+]]
 
 
 local function base64_encoded_length(len, no_padding)
@@ -82,7 +57,8 @@ ngx.encode_base64 = function (s, no_padding)
 
     local dlen = base64_encoded_length(slen, no_padding_bool)
     local dst = get_string_buf(dlen)
-    local r_dlen = ngx_lua_ffi_encode_base64(s, slen, dst, no_padding_int)
+    local r_dlen = C.ngx_http_lua_ffi_encode_base64(s, slen, dst,
+                                                    no_padding_int)
     -- if dlen ~= r_dlen then error("discrepancy in len") end
     return ffi_string(dst, r_dlen)
 end
@@ -102,7 +78,7 @@ ngx.decode_base64 = function (s)
     -- print("dlen: ", tonumber(dlen))
     local dst = get_string_buf(dlen)
     local pdlen = get_size_ptr()
-    local ok = ngx_lua_ffi_decode_base64(s, slen, dst, pdlen)
+    local ok = C.ngx_http_lua_ffi_decode_base64(s, slen, dst, pdlen)
     if ok == 0 then
         return nil
     end

@@ -11,10 +11,9 @@ local ffi_cast = ffi.cast
 local ffi_new = ffi.new
 local ffi_str = ffi.string
 local FFI_OK = base.FFI_OK
-local new_tab = base.new_tab
 local get_string_buf = base.get_string_buf
 local get_request = base.get_request
-local setmetatable = setmetatable
+local getmetatable = getmetatable
 local type = type
 local tostring = tostring
 local error = error
@@ -80,12 +79,12 @@ local function ndk_set_var_set()
 end
 
 
-if ndk then
-    local mt = new_tab(0, 2)
-    mt.__newindex = ndk_set_var_set
-    mt.__index = ndk_set_var_get
-
-    ndk.set_var = setmetatable(new_tab(0, 0), mt)
+do
+    if ndk then
+        local mt = getmetatable(ndk.set_var)
+        mt.__newindex = ndk_set_var_set
+        mt.__index = ndk_set_var_get
+    end
 end
 
 

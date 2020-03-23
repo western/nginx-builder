@@ -1,5 +1,5 @@
 std = 'ngx_lua'
-globals = { 'ngx', 'ndk' }
+globals = { 'ngx' }
 unused_args = false
 read_globals = {
     "coroutine._yield"

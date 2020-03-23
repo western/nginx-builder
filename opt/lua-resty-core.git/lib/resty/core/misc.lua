@@ -6,97 +6,103 @@ local ffi = require "ffi"
 local os = require "os"
 
 
-local C = ffi.C
-local ffi_new = ffi.new
-local ffi_str = ffi.string
-local ngx = ngx
-local type = type
-local error = error
-local rawget = rawget
-local rawset = rawset
-local tonumber = tonumber
-local setmetatable = setmetatable
 local FFI_OK = base.FFI_OK
 local FFI_NO_REQ_CTX = base.FFI_NO_REQ_CTX
 local FFI_BAD_CONTEXT = base.FFI_BAD_CONTEXT
-local new_tab = base.new_tab
-local get_request = base.get_request
-local get_size_ptr = base.get_size_ptr
 local get_string_buf = base.get_string_buf
 local get_string_buf_size = base.get_string_buf_size
+local get_size_ptr = base.get_size_ptr
+local new_tab = base.new_tab
+local C = ffi.C
+local ffi_new = ffi.new
+local ffi_str = ffi.string
+local getmetatable = getmetatable
+local ngx = ngx
+local get_request = base.get_request
+local type = type
+local error = error
+local tonumber = tonumber
 local subsystem = ngx.config.subsystem
 
 
-local ngx_lua_ffi_get_resp_status
+local _M
 local ngx_lua_ffi_get_conf_env
-local ngx_magic_key_getters
-local ngx_magic_key_setters
 
 
-local _M = new_tab(0, 3)
-local ngx_mt = new_tab(0, 2)
+if subsystem == 'http' then
+    _M = new_tab(0, 3)
 
 
-if subsystem == "http" then
-    ngx_magic_key_getters = new_tab(0, 4)
-    ngx_magic_key_setters = new_tab(0, 2)
-
-elseif subsystem == "stream" then
-    ngx_magic_key_getters = new_tab(0, 2)
-    ngx_magic_key_setters = new_tab(0, 1)
-end
+    local ngx_magic_key_getters = new_tab(0, 4)
+    local ngx_magic_key_setters = new_tab(0, 2)
 
 
-local function register_getter(key, func)
-    ngx_magic_key_getters[key] = func
-end
-_M.register_ngx_magic_key_getter = register_getter
-
-
-local function register_setter(key, func)
-    ngx_magic_key_setters[key] = func
-end
-_M.register_ngx_magic_key_setter = register_setter
-
-
-ngx_mt.__index = function (tb, key)
-    local f = ngx_magic_key_getters[key]
-    if f then
-        return f()
+    local function register_getter(key, func)
+        ngx_magic_key_getters[key] = func
     end
-    return rawget(tb, key)
-end
+    _M.register_ngx_magic_key_getter = register_getter
 
 
-ngx_mt.__newindex = function (tb, key, ctx)
-    local f = ngx_magic_key_setters[key]
-    if f then
-        return f(ctx)
+    local function register_setter(key, func)
+        ngx_magic_key_setters[key] = func
     end
-    return rawset(tb, key, ctx)
-end
+    _M.register_ngx_magic_key_setter = register_setter
 
 
-setmetatable(ngx, ngx_mt)
+    local mt = getmetatable(ngx)
 
 
-if subsystem == "http" then
+    local old_index = mt.__index
+    mt.__index = function (tb, key)
+        local f = ngx_magic_key_getters[key]
+        if f then
+            return f()
+        end
+        return old_index(tb, key)
+    end
+
+
+    local old_newindex = mt.__newindex
+    mt.__newindex = function (tb, key, ctx)
+        local f = ngx_magic_key_setters[key]
+        if f then
+            return f(ctx)
+        end
+        return old_newindex(tb, key, ctx)
+    end
+
+
     ffi.cdef[[
-    int ngx_http_lua_ffi_get_resp_status(ngx_http_request_t *r);
-    int ngx_http_lua_ffi_set_resp_status(ngx_http_request_t *r, int r);
-    int ngx_http_lua_ffi_is_subrequest(ngx_http_request_t *r);
-    int ngx_http_lua_ffi_headers_sent(ngx_http_request_t *r);
-    int ngx_http_lua_ffi_get_conf_env(const unsigned char *name,
-                                      unsigned char **env_buf,
-                                      size_t *name_len);
+int ngx_http_lua_ffi_get_resp_status(ngx_http_request_t *r);
+int ngx_http_lua_ffi_set_resp_status(ngx_http_request_t *r, int r);
+int ngx_http_lua_ffi_is_subrequest(ngx_http_request_t *r);
+int ngx_http_lua_ffi_headers_sent(ngx_http_request_t *r);
+int ngx_http_lua_ffi_get_conf_env(const unsigned char *name,
+    unsigned char **env_buf, size_t *name_len);
     ]]
 
 
-    ngx_lua_ffi_get_resp_status = C.ngx_http_lua_ffi_get_resp_status
     ngx_lua_ffi_get_conf_env = C.ngx_http_lua_ffi_get_conf_env
 
 
     -- ngx.status
+
+    local function get_status()
+        local r = get_request()
+
+        if not r then
+            error("no request found")
+        end
+
+        local rc = C.ngx_http_lua_ffi_get_resp_status(r)
+
+        if rc == FFI_BAD_CONTEXT then
+            error("API disabled in the current context", 2)
+        end
+
+        return rc
+    end
+    register_getter("status", get_status)
 
 
     local function set_status(status)
@@ -123,7 +129,6 @@ if subsystem == "http" then
 
     -- ngx.is_subrequest
 
-
     local function is_subreq()
         local r = get_request()
 
@@ -143,7 +148,6 @@ if subsystem == "http" then
 
 
     -- ngx.headers_sent
-
 
     local function headers_sent()
         local r = get_request()
@@ -166,38 +170,18 @@ if subsystem == "http" then
     end
     register_getter("headers_sent", headers_sent)
 
-elseif subsystem == "stream" then
+elseif subsystem == 'stream' then
+    _M = new_tab(0, 1)
+
+
     ffi.cdef[[
-    int ngx_stream_lua_ffi_get_resp_status(ngx_stream_lua_request_t *r);
-    int ngx_stream_lua_ffi_get_conf_env(const unsigned char *name,
-                                        unsigned char **env_buf,
-                                        size_t *name_len);
+int ngx_stream_lua_ffi_get_conf_env(const unsigned char *name,
+    unsigned char **env_buf, size_t *name_len);
     ]]
 
-    ngx_lua_ffi_get_resp_status = C.ngx_stream_lua_ffi_get_resp_status
+
     ngx_lua_ffi_get_conf_env = C.ngx_stream_lua_ffi_get_conf_env
 end
-
-
--- ngx.status
-
-
-local function get_status()
-    local r = get_request()
-
-    if not r then
-        error("no request found")
-    end
-
-    local rc = ngx_lua_ffi_get_resp_status(r)
-
-    if rc == FFI_BAD_CONTEXT then
-        error("API disabled in the current context", 2)
-    end
-
-    return rc
-end
-register_getter("status", get_status)
 
 
 do
