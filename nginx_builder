@@ -6,7 +6,7 @@
 PARENTF=`pwd`
 NGINXV='nginx-1.16.1'
 IS_LOCAL=1
-
+IS_PAUSED=0
 
 
 function main {
@@ -45,7 +45,7 @@ function prepare_for_archive {
     for mfold in echo-nginx-module.git form-input-nginx-module.git headers-more-nginx-module.git \
         lua-nginx-module.git memc-nginx-module.git naxsi.git sregex.git \
         replace-filter-nginx-module.git drizzle-nginx-module.git rds-json-nginx-module.git rds-csv-nginx-module.git \
-        ngx_postgres.git njs.git stream-lua-nginx-module.git xss-nginx-module.git \
+        ngx_postgres.git njs.git stream-lua-nginx-module.git xss-nginx-module.git nginx-rtmp-module.git \
         nginx-upload-module.git ngx_cache_purge.git ngx_devel_kit.git \
         redis2-nginx-module.git set-misc-nginx-module.git
     do
@@ -319,6 +319,7 @@ function repo_get {
     
     get_github 'openresty' 'stream-lua-nginx-module.git' 'v0.0.7'
     get_github 'openresty' 'xss-nginx-module.git'
+    get_github 'arut' 'nginx-rtmp-module.git'
     
 }
 
@@ -365,6 +366,7 @@ function lua_addition_prepare {
         cd /opt
     fi
     
+    #get_github 'openresty' 'lua-resty-core.git' 'v0.1.17'
     get_github 'openresty' 'lua-resty-core.git'
     get_github 'openresty' 'lua-resty-lrucache.git'
     get_github 'openresty' 'lua-cjson.git'
@@ -382,7 +384,9 @@ function lua_addition_prepare {
         echo
         export LUA_INCLUDE_DIR="$LUAJIT2_SRC" && make -j4
         
-        read -p "Press [Enter] key to continue..."
+        if [ $IS_PAUSED == 1 ]; then
+            read -p "Press [Enter] key to continue..."
+        fi
     popd
     
     get_github 'openresty' 'lua-resty-redis.git'
@@ -390,9 +394,13 @@ function lua_addition_prepare {
     get_github 'openresty' 'lua-resty-mysql.git'
     get_github 'openresty' 'lua-ssl-nginx-module.git'
     
-    get_github 'openresty' 'lua-resty-signal.git'
-    get_github 'openresty' 'lua-tablepool.git'
-    get_github 'openresty' 'lua-resty-shell.git'
+    get_github 'openresty' 'lua-resty-signal.git' 'v0.02'
+    pushd 'lua-resty-signal.git'
+        make clean
+        make
+    popd
+    get_github 'openresty' 'lua-tablepool.git' 'v0.01'
+    get_github 'openresty' 'lua-resty-shell.git' 'v0.02'
     
     get_github 'openresty' 'lua-resty-limit-traffic.git'
     get_github 'openresty' 'lua-resty-lock.git'
@@ -408,7 +416,7 @@ function lua_addition_prepare {
         LB="$LB$PARENTF/opt/lua-resty-lrucache.git/lib/?.lua;"
         LB="$LB$PARENTF/opt/lua-resty-redis.git/lib/?.lua;"
         LB="$LB$PARENTF/opt/lua-resty-mysql.git/lib/?.lua;"
-        LB="$LB$PARENTF/opt/lua-ssl-nginx-module.git/lib/?.lua;"
+        LB="$LB$PARENTF/opt/lua-ssl-nginx-module.git/lualib/?.lua;"
         
         LB="$LB$PARENTF/opt/lua-resty-signal.git/lib/?.lua;"
         LB="$LB$PARENTF/opt/lua-tablepool.git/lib/?.lua;"
@@ -424,7 +432,11 @@ function lua_addition_prepare {
         LB="$LB/opt/lua-resty-lrucache.git/lib/?.lua;"
         LB="$LB/opt/lua-resty-redis.git/lib/?.lua;"
         LB="$LB/opt/lua-resty-mysql.git/lib/?.lua;"
-        LB="$LB/opt/lua-ssl-nginx-module.git/lib/?.lua;"
+        LB="$LB/opt/lua-ssl-nginx-module.git/lualib/?.lua;"
+        
+        LB="$LB/opt/lua-resty-signal.git/lib/?.lua;"
+        LB="$LB/opt/lua-tablepool.git/lib/?.lua;"
+        LB="$LB/opt/lua-resty-shell.git/lib/?.lua;"
         
         local CLB="/opt/lua-cjson.git/?.so;"
         CLB="$CLB/opt/lua-resty-signal.git/?.so;"
@@ -433,7 +445,10 @@ function lua_addition_prepare {
         echo "lua_package_cpath \"$CLB;\";"
     fi
     echo
-    read -p "Press [Enter] key to continue..."
+    
+    if [ $IS_PAUSED == 1 ]; then
+        read -p "Press [Enter] key to continue..."
+    fi
     
     cd $PARENTF
 }
@@ -599,6 +614,8 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --add-module=../njs.git/nginx/ \\
 --add-module=../stream-lua-nginx-module.git/ \\
 --add-module=../xss-nginx-module.git/ \\
+--add-module=../nginx-rtmp-module.git/ \\
+--add-module=../opt/lua-ssl-nginx-module.git/ \\
 
 L10HEREDOC
     
@@ -769,7 +786,7 @@ function get_github {
         if [ "$branch" == "" ]; then
             git clone https://github.com/$1/$folderName $folderName
         else
-            notice "branch $branch"
+            warn "branch $branch"
             git clone -b $branch https://github.com/$1/$folderName $folderName
         fi
     fi
