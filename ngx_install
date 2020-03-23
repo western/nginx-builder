@@ -207,6 +207,8 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --add-module=../njs.git/nginx/ \\
 --add-module=../stream-lua-nginx-module.git/ \\
 --add-module=../xss-nginx-module.git/ \\
+--add-module=../nginx-rtmp-module.git/ \\
+--add-module=../opt/lua-ssl-nginx-module.git/ \\
 
 
 L10HEREDOC
