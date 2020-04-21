@@ -156,8 +156,8 @@ make_configure() {
     fi
     
     WITH_OPENSSL=""
-    if [ -d openssl-OpenSSL_1_1_1d ]; then
-        WITH_OPENSSL="--with-openssl=$PARENTF/openssl-OpenSSL_1_1_1d --with-openssl-opt='enable-tls1_3'"
+    if [ -d openssl-OpenSSL_1_1_1g ]; then
+        WITH_OPENSSL="--with-openssl=$PARENTF/openssl-OpenSSL_1_1_1g --with-openssl-opt='enable-tls1_3'"
     fi
     
     
