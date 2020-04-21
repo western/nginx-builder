@@ -122,6 +122,7 @@ make_configure() {
     local SCGI_TEMP_PATH=""
     local LUAJIT2_BUILD_LIB=""
     local LUAJIT2_SRC=""
+    local LUA_SSL_NGINX_MODULE=""
     
     if [ $IS_LOCAL == 1 ]; then
         mkdir -p $PARENTF/build/{tmp,proxy,fastcgi,uwsgi,scgi}
@@ -137,6 +138,7 @@ make_configure() {
         SCGI_TEMP_PATH="$PREFIX/scgi/"
         LUAJIT2_BUILD_LIB="$PARENTF/opt/luajit2.git/build/lib"
         LUAJIT2_SRC="$PARENTF/opt/luajit2.git/src"
+        LUA_SSL_NGINX_MODULE="$PARENTF/opt/lua-ssl-nginx-module.git/"
     else
         PREFIX="/usr/local/$NGINXV"
         CONF_PATH="/etc/$NGINXV/nginx.conf"
@@ -150,12 +152,14 @@ make_configure() {
         SCGI_TEMP_PATH="/var/lib/nginx/scgi/"
         LUAJIT2_BUILD_LIB="/opt/luajit2.git/build/lib"
         LUAJIT2_SRC="/opt/luajit2.git/src"
+        LUA_SSL_NGINX_MODULE="/opt/lua-ssl-nginx-module.git/"
     fi
     
     WITH_OPENSSL=""
     if [ -d openssl-OpenSSL_1_1_1d ]; then
         WITH_OPENSSL="--with-openssl=$PARENTF/openssl-OpenSSL_1_1_1d --with-openssl-opt='enable-tls1_3'"
     fi
+    
     
 cat << L10HEREDOC > $NGINXV/nginx_configuration
 #!/bin/bash
@@ -175,6 +179,7 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --http-scgi-temp-path=$SCGI_TEMP_PATH \\
 --user=nginx \\
 --group=nginx \\
+--with-debug \\
 --with-stream \\
 --with-stream_ssl_module \\
 --with-stream_ssl_preread_module \\
@@ -216,7 +221,7 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --add-module=../stream-lua-nginx-module.git/ \\
 --add-module=../xss-nginx-module.git/ \\
 --add-module=../nginx-rtmp-module.git/ \\
---add-module=../opt/lua-ssl-nginx-module.git/ \\
+--add-module=$LUA_SSL_NGINX_MODULE \\
 
 
 L10HEREDOC
