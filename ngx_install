@@ -4,7 +4,7 @@
 # ngx_install
 
 PARENTF=`pwd`
-NGINXV='nginx-1.16.1'
+NGINXV='nginx-1.18.0'
 IS_LOCAL=1
 
 
@@ -217,7 +217,6 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --add-module=../rds-csv-nginx-module.git/ \\
 --add-module=../drizzle-nginx-module.git/ \\
 --add-module=../ngx_postgres.git/ \\
---add-module=../njs.git/nginx/ \\
 --add-module=../stream-lua-nginx-module.git/ \\
 --add-module=../xss-nginx-module.git/ \\
 --add-module=../nginx-rtmp-module.git/ \\
