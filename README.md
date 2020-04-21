@@ -12,7 +12,7 @@ based on https://gist.github.com/western/c04efe49745f24874c43
 
 ## fixed versions
 
-* nginx 1.16.1
+* nginx 1.18.0
 * openresty.org/download/drizzle7-2011.07.21.tar.gz
 drizzle7-2011.07.21.tar.gz
 * github.com/openssl/openssl/archive/OpenSSL_1_1_1d.tar.gz
@@ -20,7 +20,7 @@ drizzle7-2011.07.21.tar.gz
 
 ## new
 
-* nginx-rtmp-module
+* nginx 1.18.0
 
 ## modules
 
