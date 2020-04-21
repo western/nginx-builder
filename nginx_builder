@@ -4,7 +4,7 @@
 # . nginx_builder
 
 PARENTF=`pwd`
-NGINXV='nginx-1.16.1'
+NGINXV='nginx-1.18.0'
 IS_LOCAL=1
 IS_PAUSED=0
 
