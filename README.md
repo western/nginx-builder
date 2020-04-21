@@ -15,12 +15,13 @@ based on https://gist.github.com/western/c04efe49745f24874c43
 * nginx 1.18.0
 * openresty.org/download/drizzle7-2011.07.21.tar.gz
 drizzle7-2011.07.21.tar.gz
-* github.com/openssl/openssl/archive/OpenSSL_1_1_1d.tar.gz
+* github.com/openssl/openssl/archive/OpenSSL_1_1_1g.tar.gz
 1.1.1d
 
 ## new
 
 * nginx 1.18.0
+* OpenSSL_1_1_1g
 
 ## modules
 
