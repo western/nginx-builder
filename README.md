@@ -20,7 +20,6 @@ drizzle7-2011.07.21.tar.gz
 
 ## new
 
-* nginx 1.18.0
 * OpenSSL_1_1_1g
 
 ## modules
