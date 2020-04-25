@@ -1,6 +1,7 @@
 
 /*
  * Copyright (C) Roman Arutyunyan
+ * Copyright (C) Dmitry Volyntsev
  * Copyright (C) NGINX, Inc.
  */
 
@@ -14,6 +15,10 @@
 
 typedef struct {
     njs_vm_t              *vm;
+    ngx_str_t              include;
+    u_char                *file;
+    ngx_uint_t             line;
+    ngx_array_t           *imports;
     ngx_array_t           *paths;
     njs_external_proto_t   req_proto;
 } ngx_http_js_main_conf_t;
@@ -22,6 +27,14 @@ typedef struct {
 typedef struct {
     ngx_str_t              content;
 } ngx_http_js_loc_conf_t;
+
+
+typedef struct {
+    ngx_str_t              name;
+    ngx_str_t              path;
+    u_char                *file;
+    ngx_uint_t             line;
+} ngx_http_js_import_t;
 
 
 typedef struct {
@@ -44,6 +57,15 @@ typedef struct {
 } ngx_http_js_event_t;
 
 
+typedef struct {
+    njs_str_t              name;
+    njs_int_t            (*handler)(njs_vm_t *vm, ngx_http_request_t *r,
+                                    njs_str_t *name, njs_value_t *setval,
+                                    njs_value_t *retval);
+
+}  ngx_http_js_header_t;
+
+
 static ngx_int_t ngx_http_js_content_handler(ngx_http_request_t *r);
 static void ngx_http_js_content_event_handler(ngx_http_request_t *r);
 static void ngx_http_js_content_write_event_handler(ngx_http_request_t *r);
@@ -59,12 +81,31 @@ static njs_int_t ngx_http_js_ext_get_string(njs_vm_t *vm,
     njs_object_prop_t *prop, njs_value_t *value, njs_value_t *setval,
     njs_value_t *retval);
 static njs_int_t ngx_http_js_ext_keys_header(njs_vm_t *vm, njs_value_t *value,
-    njs_value_t *keys, uintptr_t data);
+    njs_value_t *keys, ngx_list_t *headers);
 static ngx_table_elt_t *ngx_http_js_get_header(ngx_list_part_t *part,
     u_char *data, size_t len);
 static njs_int_t ngx_http_js_ext_header_out(njs_vm_t *vm,
     njs_object_prop_t *prop, njs_value_t *value, njs_value_t *setval,
     njs_value_t *retval);
+static njs_int_t ngx_http_js_header_out_single(njs_vm_t *vm,
+    ngx_http_request_t *r, njs_str_t *v, njs_value_t *setval,
+    njs_value_t *retval);
+static njs_int_t ngx_http_js_header_out_special(njs_vm_t *vm,
+    ngx_http_request_t *r, njs_str_t *v, njs_value_t *setval,
+    njs_value_t *retval, ngx_table_elt_t **hh);
+static njs_int_t ngx_http_js_header_out_array(njs_vm_t *vm,
+    ngx_http_request_t *r, njs_str_t *v, njs_value_t *setval,
+    njs_value_t *retval);
+static njs_int_t ngx_http_js_header_out_generic(njs_vm_t *vm,
+    ngx_http_request_t *r, njs_str_t *v, njs_value_t *setval,
+    njs_value_t *retval);
+static njs_int_t ngx_http_js_content_length(njs_vm_t *vm, ngx_http_request_t *r,
+    njs_str_t *name, njs_value_t *setval, njs_value_t *retval);
+static njs_int_t ngx_http_js_content_encoding(njs_vm_t *vm,
+    ngx_http_request_t *r, njs_str_t *name, njs_value_t *setval,
+    njs_value_t *retval);
+static njs_int_t ngx_http_js_content_type(njs_vm_t *vm, ngx_http_request_t *r,
+    njs_str_t *name, njs_value_t *setval, njs_value_t *retval);
 static njs_int_t ngx_http_js_ext_keys_header_out(njs_vm_t *vm,
     njs_value_t *value, njs_value_t *keys);
 static njs_int_t ngx_http_js_ext_status(njs_vm_t *vm, njs_object_prop_t *prop,
@@ -131,10 +172,13 @@ static njs_int_t ngx_http_js_string(njs_vm_t *vm, njs_value_t *value,
 
 static char *ngx_http_js_include(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+static char *ngx_http_js_import(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
 static char *ngx_http_js_set(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_http_js_content(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 static void *ngx_http_js_create_main_conf(ngx_conf_t *cf);
+static char *ngx_http_js_init_main_conf(ngx_conf_t *cf, void *conf);
 static void *ngx_http_js_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_js_merge_loc_conf(ngx_conf_t *cf, void *parent,
     void *child);
@@ -145,6 +189,13 @@ static ngx_command_t  ngx_http_js_commands[] = {
     { ngx_string("js_include"),
       NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
       ngx_http_js_include,
+      NGX_HTTP_MAIN_CONF_OFFSET,
+      offsetof(ngx_http_js_main_conf_t, include),
+      NULL },
+
+    { ngx_string("js_import"),
+      NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE13,
+      ngx_http_js_import,
       NGX_HTTP_MAIN_CONF_OFFSET,
       0,
       NULL },
@@ -179,7 +230,7 @@ static ngx_http_module_t  ngx_http_js_module_ctx = {
     NULL,                          /* postconfiguration */
 
     ngx_http_js_create_main_conf,  /* create main configuration */
-    NULL,                          /* init main configuration */
+    ngx_http_js_init_main_conf,    /* init main configuration */
 
     NULL,                          /* create server configuration */
     NULL,                          /* merge server configuration */
@@ -776,34 +827,21 @@ ngx_http_js_ext_get_string(njs_vm_t *vm, njs_object_prop_t *prop,
 
 static njs_int_t
 ngx_http_js_ext_keys_header(njs_vm_t *vm, njs_value_t *value, njs_value_t *keys,
-    uintptr_t data)
+    ngx_list_t *headers)
 {
-    char             *p;
-    njs_int_t         rc, cookie, x_for;
+    int64_t           i, length;
+    njs_int_t         rc;
+    njs_str_t         hdr;
     ngx_uint_t        item;
-    ngx_list_t       *headers;
+    njs_value_t      *start;
     ngx_list_part_t  *part;
     ngx_table_elt_t  *header, *h;
 
-    rc = njs_vm_array_alloc(vm, keys, 8);
-    if (rc != NJS_OK) {
-        return NJS_ERROR;
-    }
-
-    p = njs_vm_external(vm, value);
-    if (p == NULL) {
-        return NJS_OK;
-    }
-
-    headers = (ngx_list_t *) (p + data);
     part = &headers->part;
     item = 0;
-
-    cookie = 0;
-    x_for = 0;
+    length = 0;
 
     while (part) {
-
         if (item >= part->nelts) {
             part = part->next;
             item = 0;
@@ -817,36 +855,30 @@ ngx_http_js_ext_keys_header(njs_vm_t *vm, njs_value_t *value, njs_value_t *keys,
             continue;
         }
 
-        if (h->key.len == njs_length("Cookie")
-            && ngx_strncasecmp(h->key.data, (u_char *) "Cookie",
-                               h->key.len) == 0)
-        {
-            if (cookie) {
-                continue;
+        start = njs_vm_array_start(vm, keys);
+
+        for (i = 0; i < length; i++) {
+            njs_value_string_get(njs_argument(start, i), &hdr);
+
+            if (h->key.len == hdr.length
+                && ngx_strncasecmp(h->key.data, hdr.start, hdr.length) == 0)
+            {
+                break;
+            }
+        }
+
+        if (i == length) {
+            value = njs_vm_array_push(vm, keys);
+            if (value == NULL) {
+                return NJS_ERROR;
             }
 
-            cookie = 1;
-        }
-
-        if (h->key.len == njs_length("X-Forwarded-For")
-            && ngx_strncasecmp(h->key.data, (u_char *) "X-Forwarded-For",
-                               h->key.len) == 0)
-        {
-            if (x_for) {
-                continue;
+            rc = njs_vm_value_string_set(vm, value, h->key.data, h->key.len);
+            if (rc != NJS_OK) {
+                return NJS_ERROR;
             }
 
-            x_for = 1;
-        }
-
-        value = njs_vm_array_push(vm, keys);
-        if (value == NULL) {
-            return NJS_ERROR;
-        }
-
-        rc = njs_vm_value_string_set(vm, value, h->key.data, h->key.len);
-        if (rc != NJS_OK) {
-            return NJS_ERROR;
+            length++;
         }
     }
 
@@ -893,14 +925,24 @@ static njs_int_t
 ngx_http_js_ext_header_out(njs_vm_t *vm, njs_object_prop_t *prop,
     njs_value_t *value, njs_value_t *setval, njs_value_t *retval)
 {
-    u_char              *p, *start;
-    njs_int_t            rc;
-    ngx_int_t            n;
-    njs_str_t           *v, s, name;
-    ngx_str_t           *hdr;
-    ngx_table_elt_t     *h;
-    ngx_http_request_t  *r;
-    u_char               content_len[NGX_OFF_T_LEN];
+    njs_int_t              rc;
+    njs_str_t              name;
+    ngx_http_request_t    *r;
+    ngx_http_js_header_t  *h;
+
+    static ngx_http_js_header_t headers_out[] = {
+        { njs_str("Age"), ngx_http_js_header_out_single },
+        { njs_str("Content-Type"), ngx_http_js_content_type },
+        { njs_str("Content-Length"), ngx_http_js_content_length },
+        { njs_str("Content-Encoding"), ngx_http_js_content_encoding },
+        { njs_str("Etag"), ngx_http_js_header_out_single },
+        { njs_str("Expires"), ngx_http_js_header_out_single },
+        { njs_str("Last-Modified"), ngx_http_js_header_out_single },
+        { njs_str("Location"), ngx_http_js_header_out_single },
+        { njs_str("Set-Cookie"), ngx_http_js_header_out_array },
+        { njs_str("Retry-After"), ngx_http_js_header_out_single },
+        { njs_str(""), ngx_http_js_header_out_generic },
+    };
 
     r = njs_vm_external(vm, value);
     if (r == NULL) {
@@ -920,73 +962,76 @@ ngx_http_js_ext_header_out(njs_vm_t *vm, njs_object_prop_t *prop,
         return NJS_DECLINED;
     }
 
-    v = &name;
+    for (h = headers_out; h->name.length > 0; h++) {
+        if (h->name.length == name.length
+            && ngx_strncasecmp(h->name.start, name.start, name.length) == 0)
+        {
+            break;
+        }
+    }
+
+    return h->handler(vm, r, &name, setval, retval);
+}
+
+
+static njs_int_t
+ngx_http_js_header_out_single(njs_vm_t *vm, ngx_http_request_t *r,
+    njs_str_t *name, njs_value_t *setval, njs_value_t *retval)
+{
+    if (retval != NULL && setval == NULL) {
+        return ngx_http_js_header_out_special(vm, r, name, setval, retval,
+                                              NULL);
+    }
+
+    return ngx_http_js_header_out_generic(vm, r, name, setval, retval);
+}
+
+
+static njs_int_t
+ngx_http_js_header_out_special(njs_vm_t *vm, ngx_http_request_t *r,
+    njs_str_t *v, njs_value_t *setval, njs_value_t *retval,
+    ngx_table_elt_t **hh)
+{
+    u_char              *p;
+    int64_t              length;
+    njs_int_t            rc;
+    njs_str_t            s;
+    ngx_list_t          *headers;
+    ngx_table_elt_t     *h;
+    njs_opaque_value_t   lvalue;
+
+    headers = &r->headers_out.headers;
 
     if (retval != NULL && setval == NULL) {
-        if (v->length == njs_length("Content-Type")
-            && ngx_strncasecmp(v->start, (u_char *) "Content-Type",
-                               v->length) == 0)
-        {
-            hdr = &r->headers_out.content_type;
-            return njs_vm_value_string_set(vm, retval, hdr->data, hdr->len);
-        }
-
-        if (v->length == njs_length("Content-Length")
-            && ngx_strncasecmp(v->start, (u_char *) "Content-Length",
-                               v->length) == 0)
-        {
-            if (r->headers_out.content_length == NULL
-                && r->headers_out.content_length_n >= 0)
-            {
-                p = ngx_sprintf(content_len, "%O",
-                                r->headers_out.content_length_n);
-
-                start = njs_vm_value_string_alloc(vm, retval, p - content_len);
-                if (start == NULL) {
-                    return NJS_ERROR;
-                }
-
-                ngx_memcpy(start, content_len, p - content_len);
-
-                return NJS_OK;
-            }
-        }
-
-        h = ngx_http_js_get_header(&r->headers_out.headers.part, v->start,
-                                   v->length);
+        h = ngx_http_js_get_header(&headers->part, v->start, v->length);
         if (h == NULL) {
             njs_value_undefined_set(retval);
             return NJS_DECLINED;
         }
 
-        return njs_vm_value_string_set(vm, retval, h->value.data, h->value.len);
-    }
-
-    if (setval != NULL) {
-        rc = ngx_http_js_string(vm, setval, &s);
+        rc = njs_vm_value_string_set(vm, retval, h->value.data, h->value.len);
         if (rc != NJS_OK) {
             return NJS_ERROR;
         }
 
-    } else {
-        s.length = 0;
-        s.start = NULL;
-    }
-
-    if (v->length == njs_length("Content-Type")
-        && ngx_strncasecmp(v->start, (u_char *) "Content-Type",
-                           v->length) == 0)
-    {
-        r->headers_out.content_type.len = s.length;
-        r->headers_out.content_type_len = r->headers_out.content_type.len;
-        r->headers_out.content_type.data = s.start;
-        r->headers_out.content_type_lowcase = NULL;
-
         return NJS_OK;
     }
 
-    h = ngx_http_js_get_header(&r->headers_out.headers.part, v->start,
-                               v->length);
+    if (setval != NULL && njs_value_is_array(setval)) {
+        rc = njs_vm_array_length(vm, setval, &length);
+        if (rc != NJS_OK) {
+            return NJS_ERROR;
+        }
+
+        setval = njs_vm_array_prop(vm, setval, length - 1, &lvalue);
+    }
+
+    rc = ngx_http_js_string(vm, setval, &s);
+    if (rc != NJS_OK) {
+        return NJS_ERROR;
+    }
+
+    h = ngx_http_js_get_header(&headers->part, v->start, v->length);
 
     if (h != NULL && s.length == 0) {
         h->hash = 0;
@@ -994,7 +1039,7 @@ ngx_http_js_ext_header_out(njs_vm_t *vm, njs_object_prop_t *prop,
     }
 
     if (h == NULL && s.length != 0) {
-        h = ngx_list_push(&r->headers_out.headers);
+        h = ngx_list_push(headers);
         if (h == NULL) {
             return NJS_ERROR;
         }
@@ -1023,22 +1068,313 @@ ngx_http_js_ext_header_out(njs_vm_t *vm, njs_object_prop_t *prop,
         h->hash = 1;
     }
 
-    if (v->length == njs_length("Content-Encoding")
-        && ngx_strncasecmp(v->start, (u_char *) "Content-Encoding",
-                           v->length) == 0)
-    {
+    if (hh != NULL) {
+        *hh = h;
+    }
+
+    return NJS_OK;
+}
+
+
+static njs_int_t
+ngx_http_js_header_out_array(njs_vm_t *vm, ngx_http_request_t *r,
+    njs_str_t *name, njs_value_t *setval, njs_value_t *retval)
+{
+    size_t            len;
+    u_char           *data;
+    njs_int_t         rc;
+    ngx_uint_t        i;
+    ngx_list_t       *headers;
+    njs_value_t      *value;
+    ngx_list_part_t  *part;
+    ngx_table_elt_t  *header, *h;
+
+    headers = &r->headers_out.headers;
+
+    if (retval != NULL && setval == NULL) {
+        rc = njs_vm_array_alloc(vm, retval, 4);
+        if (rc != NJS_OK) {
+            return NJS_ERROR;
+        }
+
+        len = name->length;
+        data = name->start;
+
+        part = &headers->part;
+        header = part->elts;
+
+        for (i = 0; /* void */ ; i++) {
+
+            if (i >= part->nelts) {
+                if (part->next == NULL) {
+                    break;
+                }
+
+                part = part->next;
+                header = part->elts;
+                i = 0;
+            }
+
+            h = &header[i];
+
+            if (h->hash == 0
+                || h->key.len != len
+                || ngx_strncasecmp(h->key.data, data, len) != 0)
+            {
+                continue;
+            }
+
+            value = njs_vm_array_push(vm, retval);
+            if (value == NULL) {
+                return NJS_ERROR;
+            }
+
+            rc = njs_vm_value_string_set(vm, value, h->value.data,
+                                         h->value.len);
+            if (rc != NJS_OK) {
+                return NJS_ERROR;
+            }
+        }
+
+        return NJS_OK;
+    }
+
+    return ngx_http_js_header_out_generic(vm, r, name, setval, retval);
+}
+
+
+static njs_int_t
+ngx_http_js_header_out_generic(njs_vm_t *vm, ngx_http_request_t *r,
+    njs_str_t *name, njs_value_t *setval, njs_value_t *retval)
+{
+    size_t               len;
+    u_char              *data, *p, *start, *end;
+    int64_t              length;
+    njs_value_t         *array;
+    njs_int_t            rc;
+    njs_str_t            s;
+    ngx_list_t          *headers;
+    ngx_uint_t           i;
+    ngx_list_part_t     *part;
+    ngx_table_elt_t     *header, *h;
+    njs_opaque_value_t   lvalue;
+
+    headers = &r->headers_out.headers;
+    part = &headers->part;
+
+    if (retval != NULL && setval == NULL) {
+        header = part->elts;
+
+        p = NULL;
+        start = NULL;
+        end  = NULL;
+
+        for (i = 0; /* void */ ; i++) {
+
+            if (i >= part->nelts) {
+                if (part->next == NULL) {
+                    break;
+                }
+
+                part = part->next;
+                header = part->elts;
+                i = 0;
+            }
+
+            h = &header[i];
+
+            if (h->hash == 0
+                || h->key.len != name->length
+                || ngx_strncasecmp(h->key.data, name->start, name->length) != 0)
+            {
+                continue;
+            }
+
+            if (p == NULL) {
+                start = h->value.data;
+                end = h->value.data + h->value.len;
+                p = end;
+                continue;
+            }
+
+            if (p + h->value.len + 1 > end) {
+                len = njs_max(p + h->value.len + 1 - start, 2 * (end - start));
+
+                data = ngx_pnalloc(r->pool, len);
+                if (data == NULL) {
+                    return NJS_ERROR;
+                }
+
+                p = ngx_cpymem(data, start, p - start);
+                start = data;
+                end = data + len;
+            }
+
+            *p++ = ',';
+            p = ngx_cpymem(p, h->value.data, h->value.len);
+        }
+
+        if (p == NULL) {
+            njs_value_undefined_set(retval);
+            return NJS_DECLINED;
+        }
+
+        return njs_vm_value_string_set(vm, retval, start, p - start);
+    }
+
+    header = part->elts;
+
+    for (i = 0; /* void */ ; i++) {
+
+        if (i >= part->nelts) {
+            if (part->next == NULL) {
+                break;
+            }
+
+            part = part->next;
+            header = part->elts;
+            i = 0;
+        }
+
+        h = &header[i];
+
+        if (h->hash == 0
+            || h->key.len != name->length
+            || ngx_strncasecmp(h->key.data, name->start, name->length) != 0)
+        {
+            continue;
+        }
+
+        h->hash = 0;
+    }
+
+    if (retval == NULL) {
+        return NJS_OK;
+    }
+
+    if (njs_value_is_array(setval)) {
+        array = setval;
+
+        rc = njs_vm_array_length(vm, array, &length);
+        if (rc != NJS_OK) {
+            return NJS_ERROR;
+        }
+
+        if (length == 0) {
+            return NJS_OK;
+        }
+
+    } else {
+        array = NULL;
+        length = 1;
+    }
+
+    i = 0;
+
+    for (i = 0; i < (ngx_uint_t) length; i++) {
+        if (array != NULL) {
+            setval = njs_vm_array_prop(vm, array, i, &lvalue);
+        }
+
+        rc = ngx_http_js_string(vm, setval, &s);
+        if (rc != NJS_OK) {
+            return NJS_ERROR;
+        }
+
+        if (s.length == 0) {
+            continue;
+        }
+
+        h = ngx_list_push(headers);
+        if (h == NULL) {
+            return NJS_ERROR;
+        }
+
+        p = ngx_pnalloc(r->pool, name->length);
+        if (p == NULL) {
+            return NJS_ERROR;
+        }
+
+        ngx_memcpy(p, name->start, name->length);
+
+        h->key.data = p;
+        h->key.len = name->length;
+
+        p = ngx_pnalloc(r->pool, s.length);
+        if (p == NULL) {
+            return NJS_ERROR;
+        }
+
+        ngx_memcpy(p, s.start, s.length);
+
+        h->value.data = p;
+        h->value.len = s.length;
+        h->hash = 1;
+    }
+
+    return NJS_OK;
+}
+
+
+static njs_int_t
+ngx_http_js_content_encoding(njs_vm_t *vm, ngx_http_request_t *r, njs_str_t *v,
+    njs_value_t *setval, njs_value_t *retval)
+{
+    njs_int_t         rc;
+    ngx_table_elt_t  *h;
+
+    rc = ngx_http_js_header_out_special(vm, r, v, setval, retval, &h);
+    if (rc != NJS_OK) {
+        return NJS_ERROR;
+    }
+
+    if (setval != NULL || retval == NULL) {
         r->headers_out.content_encoding = h;
     }
 
-    if (v->length == njs_length("Content-Length")
-        && ngx_strncasecmp(v->start, (u_char *) "Content-Length",
-                           v->length) == 0)
-    {
+    return NJS_OK;
+}
+
+
+static njs_int_t
+ngx_http_js_content_length(njs_vm_t *vm, ngx_http_request_t *r, njs_str_t *v,
+    njs_value_t *setval, njs_value_t *retval)
+{
+    u_char           *p, *start;
+    njs_int_t         rc;
+    ngx_int_t         n;
+    ngx_table_elt_t  *h;
+    u_char            content_len[NGX_OFF_T_LEN];
+
+    if (retval != NULL && setval == NULL) {
+        if (r->headers_out.content_length == NULL
+            && r->headers_out.content_length_n >= 0)
+        {
+            p = ngx_sprintf(content_len, "%O", r->headers_out.content_length_n);
+
+            start = njs_vm_value_string_alloc(vm, retval, p - content_len);
+            if (start == NULL) {
+                return NJS_ERROR;
+            }
+
+            ngx_memcpy(start, content_len, p - content_len);
+
+            return NJS_OK;
+        }
+    }
+
+    rc = ngx_http_js_header_out_special(vm, r, v, setval, retval, &h);
+    if (rc != NJS_OK) {
+        return NJS_ERROR;
+    }
+
+    if (setval != NULL || retval == NULL) {
         if (h != NULL) {
-            n = ngx_atoi(s.start, s.length);
+            n = ngx_atoi(h->value.data, h->value.len);
             if (n == NGX_ERROR) {
                 h->hash = 0;
-                njs_vm_error(vm, "failed converting argument to integer");
+                njs_vm_error(vm, "failed converting argument "
+                             "to positive integer");
                 return NJS_ERROR;
             }
 
@@ -1055,11 +1391,90 @@ ngx_http_js_ext_header_out(njs_vm_t *vm, njs_object_prop_t *prop,
 
 
 static njs_int_t
+ngx_http_js_content_type(njs_vm_t *vm, ngx_http_request_t *r, njs_str_t *v,
+    njs_value_t *setval, njs_value_t *retval)
+{
+    int64_t              length;
+    njs_int_t            rc;
+    njs_str_t            s;
+    ngx_str_t           *hdr;
+    njs_opaque_value_t   lvalue;
+
+    if (retval != NULL && setval == NULL) {
+        hdr = &r->headers_out.content_type;
+        return njs_vm_value_string_set(vm, retval, hdr->data, hdr->len);
+    }
+
+    if (setval != NULL && njs_value_is_array(setval)) {
+        rc = njs_vm_array_length(vm, setval, &length);
+        if (rc != NJS_OK) {
+            return NJS_ERROR;
+        }
+
+        setval = njs_vm_array_prop(vm, setval, length - 1, &lvalue);
+    }
+
+    rc = ngx_http_js_string(vm, setval, &s);
+    if (rc != NJS_OK) {
+        return NJS_ERROR;
+    }
+
+    r->headers_out.content_type.len = s.length;
+    r->headers_out.content_type_len = r->headers_out.content_type.len;
+    r->headers_out.content_type.data = s.start;
+    r->headers_out.content_type_lowcase = NULL;
+
+    return NJS_OK;
+}
+
+
+static njs_int_t
 ngx_http_js_ext_keys_header_out(njs_vm_t *vm, njs_value_t *value,
     njs_value_t *keys)
 {
+    njs_int_t           rc;
+    ngx_http_request_t  *r;
+
+    rc = njs_vm_array_alloc(vm, keys, 8);
+    if (rc != NJS_OK) {
+        return NJS_ERROR;
+    }
+
+    r = njs_vm_external(vm, value);
+    if (r == NULL) {
+        return NJS_OK;
+    }
+
+    if (r->headers_out.content_type.len) {
+        value = njs_vm_array_push(vm, keys);
+        if (value == NULL) {
+            return NJS_ERROR;
+        }
+
+        rc = njs_vm_value_string_set(vm, value, (u_char *) "Content-Type",
+                                     njs_length("Content-Type"));
+        if (rc != NJS_OK) {
+            return NJS_ERROR;
+        }
+    }
+
+    if (r->headers_out.content_length == NULL
+        && r->headers_out.content_length_n >= 0)
+    {
+        value = njs_vm_array_push(vm, keys);
+        if (value == NULL) {
+            return NJS_ERROR;
+        }
+
+        rc = njs_vm_value_string_set(vm, value, (u_char *) "Content-Length",
+                                     njs_length("Content-Length"));
+        if (rc != NJS_OK) {
+            return NJS_ERROR;
+        }
+    }
+
     return ngx_http_js_ext_keys_header(vm, value, keys,
-                             offsetof(ngx_http_request_t, headers_out.headers));
+                                       &r->headers_out.headers);
 }
 
 
@@ -1593,8 +2008,20 @@ static njs_int_t
 ngx_http_js_ext_keys_header_in(njs_vm_t *vm, njs_value_t *value,
     njs_value_t *keys)
 {
-    return ngx_http_js_ext_keys_header(vm, value, keys,
-                              offsetof(ngx_http_request_t, headers_in.headers));
+    njs_int_t           rc;
+    ngx_http_request_t  *r;
+
+    rc = njs_vm_array_alloc(vm, keys, 8);
+    if (rc != NJS_OK) {
+        return NJS_ERROR;
+    }
+
+    r = njs_vm_external(vm, value);
+    if (r == NULL) {
+        return NJS_OK;
+    }
+
+    return ngx_http_js_ext_keys_header(vm, value, keys, &r->headers_in.headers);
 }
 
 static njs_int_t
@@ -1806,6 +2233,7 @@ ngx_http_js_ext_subrequest(njs_vm_t *vm, njs_value_t *args, njs_uint_t nargs,
     njs_value_t              *value, *arg, *options;
     njs_function_t           *callback;
     ngx_http_js_ctx_t        *ctx;
+    njs_opaque_value_t        lvalue;
     ngx_http_request_t       *r, *sr;
     ngx_http_request_body_t  *rb;
 
@@ -1891,7 +2319,7 @@ ngx_http_js_ext_subrequest(njs_vm_t *vm, njs_value_t *args, njs_uint_t nargs,
     }
 
     if (options != NULL) {
-        value = njs_vm_object_prop(vm, options, &args_key);
+        value = njs_vm_object_prop(vm, options, &args_key, &lvalue);
         if (value != NULL) {
             if (ngx_http_js_string(vm, value, &args_arg) != NJS_OK) {
                 njs_vm_error(vm, "failed to convert options.args");
@@ -1899,12 +2327,12 @@ ngx_http_js_ext_subrequest(njs_vm_t *vm, njs_value_t *args, njs_uint_t nargs,
             }
         }
 
-        value = njs_vm_object_prop(vm, options, &detached_key);
+        value = njs_vm_object_prop(vm, options, &detached_key, &lvalue);
         if (value != NULL) {
             detached = njs_value_bool(value);
         }
 
-        value = njs_vm_object_prop(vm, options, &method_key);
+        value = njs_vm_object_prop(vm, options, &method_key, &lvalue);
         if (value != NULL) {
             if (ngx_http_js_string(vm, value, &method_name) != NJS_OK) {
                 njs_vm_error(vm, "failed to convert options.method");
@@ -1924,7 +2352,7 @@ ngx_http_js_ext_subrequest(njs_vm_t *vm, njs_value_t *args, njs_uint_t nargs,
             }
         }
 
-        value = njs_vm_object_prop(vm, options, &body_key);
+        value = njs_vm_object_prop(vm, options, &body_key, &lvalue);
         if (value != NULL) {
             if (ngx_http_js_string(vm, value, &body_arg) != NJS_OK) {
                 njs_vm_error(vm, "failed to convert options.body");
@@ -2312,7 +2740,7 @@ ngx_http_js_handle_event(ngx_http_request_t *r, njs_vm_event_t vm_event,
 static njs_int_t
 ngx_http_js_string(njs_vm_t *vm, njs_value_t *value, njs_str_t *str)
 {
-    if (!njs_value_is_null_or_undefined(value)) {
+    if (value != NULL && !njs_value_is_null_or_undefined(value)) {
         if (njs_vm_value_to_string(vm, str, value) == NJS_ERROR) {
             return NJS_ERROR;
         }
@@ -2327,96 +2755,133 @@ ngx_http_js_string(njs_vm_t *vm, njs_value_t *value, njs_str_t *str)
 
 
 static char *
-ngx_http_js_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_http_js_init_main_conf(ngx_conf_t *cf, void *conf)
 {
     ngx_http_js_main_conf_t *jmcf = conf;
 
     size_t                 size;
-    u_char                *start, *end;
+    u_char                *start, *end, *p;
     ssize_t                n;
     ngx_fd_t               fd;
-    ngx_str_t             *m, *value, file;
+    ngx_str_t             *m, file;
     njs_int_t              rc;
     njs_str_t              text, path;
     ngx_uint_t             i;
+    njs_value_t           *value;
     njs_vm_opt_t           options;
     ngx_file_info_t        fi;
     ngx_pool_cleanup_t    *cln;
+    njs_opaque_value_t     lvalue, exception;
     njs_external_proto_t   proto;
+    ngx_http_js_import_t  *import;
 
-    if (jmcf->vm) {
-        return "is duplicate";
+    static const njs_str_t line_number_key = njs_str("lineNumber");
+    static const njs_str_t file_name_key = njs_str("fileName");
+
+    if (jmcf->include.len == 0 && jmcf->imports == NGX_CONF_UNSET_PTR) {
+        return NGX_CONF_OK;
     }
 
-    value = cf->args->elts;
-    file = value[1];
+    size = 0;
+    fd = NGX_INVALID_FILE;
 
-    if (ngx_conf_full_name(cf->cycle, &file, 1) != NGX_OK) {
-        return NGX_CONF_ERROR;
+    if (jmcf->include.len != 0) {
+        file = jmcf->include;
+
+        if (ngx_conf_full_name(cf->cycle, &file, 1) != NGX_OK) {
+            return NGX_CONF_ERROR;
+        }
+
+        fd = ngx_open_file(file.data, NGX_FILE_RDONLY, NGX_FILE_OPEN, 0);
+        if (fd == NGX_INVALID_FILE) {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
+                          ngx_open_file_n " \"%s\" failed", file.data);
+            return NGX_CONF_ERROR;
+        }
+
+        if (ngx_fd_info(fd, &fi) == NGX_FILE_ERROR) {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
+                          ngx_fd_info_n " \"%s\" failed", file.data);
+            (void) ngx_close_file(fd);
+            return NGX_CONF_ERROR;
+        }
+
+        size = ngx_file_size(&fi);
+
+    } else {
+        import = jmcf->imports->elts;
+        for (i = 0; i < jmcf->imports->nelts; i++) {
+            size += sizeof("import  from '';\n") - 1 + import[i].name.len
+                    + import[i].path.len;
+        }
     }
-
-    fd = ngx_open_file(file.data, NGX_FILE_RDONLY, NGX_FILE_OPEN, 0);
-    if (fd == NGX_INVALID_FILE) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, ngx_errno,
-                           ngx_open_file_n " \"%s\" failed", file.data);
-        return NGX_CONF_ERROR;
-    }
-
-    if (ngx_fd_info(fd, &fi) == NGX_FILE_ERROR) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, ngx_errno,
-                           ngx_fd_info_n " \"%s\" failed", file.data);
-        (void) ngx_close_file(fd);
-        return NGX_CONF_ERROR;
-    }
-
-    size = ngx_file_size(&fi);
 
     start = ngx_pnalloc(cf->pool, size);
     if (start == NULL) {
-        (void) ngx_close_file(fd);
+        if (fd != NGX_INVALID_FILE) {
+            (void) ngx_close_file(fd);
+        }
+
         return NGX_CONF_ERROR;
     }
 
-    n = ngx_read_fd(fd, start,  size);
+    if (jmcf->include.len != 0) {
+        n = ngx_read_fd(fd, start, size);
 
-    if (n == -1) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, ngx_errno,
-                           ngx_read_fd_n " \"%s\" failed", file.data);
+        if (n == -1) {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
+                          ngx_read_fd_n " \"%s\" failed", file.data);
 
-        (void) ngx_close_file(fd);
-        return NGX_CONF_ERROR;
+            (void) ngx_close_file(fd);
+            return NGX_CONF_ERROR;
+        }
+
+        if ((size_t) n != size) {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                          ngx_read_fd_n " has read only %z "
+                          "of %O from \"%s\"", n, size, file.data);
+
+            (void) ngx_close_file(fd);
+            return NGX_CONF_ERROR;
+        }
+
+        if (ngx_close_file(fd) == NGX_FILE_ERROR) {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, ngx_errno,
+                          ngx_close_file_n " %s failed", file.data);
+        }
+
+    } else {
+        p = start;
+        import = jmcf->imports->elts;
+        for (i = 0; i < jmcf->imports->nelts; i++) {
+            p = ngx_cpymem(p, "import ", sizeof("import ") - 1);
+            p = ngx_cpymem(p, import[i].name.data, import[i].name.len);
+            p = ngx_cpymem(p, " from '", sizeof(" from '") - 1);
+            p = ngx_cpymem(p, import[i].path.data, import[i].path.len);
+            p = ngx_cpymem(p, "';\n", sizeof("';\n") - 1);
+        }
     }
 
-    if ((size_t) n != size) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           ngx_read_fd_n " has read only %z of %O from \"%s\"",
-                           n, size, file.data);
-
-        (void) ngx_close_file(fd);
-        return NGX_CONF_ERROR;
-    }
-
-    if (ngx_close_file(fd) == NGX_FILE_ERROR) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, ngx_errno,
-                           ngx_close_file_n " %s failed", file.data);
-    }
-
-    end = start + size;
-
-    ngx_memzero(&options, sizeof(njs_vm_opt_t));
+    njs_vm_opt_init(&options);
 
     options.backtrace = 1;
     options.ops = &ngx_http_js_ops;
     options.argv = ngx_argv;
     options.argc = ngx_argc;
 
-    file = value[1];
+    if (jmcf->include.len != 0) {
+        file = jmcf->include;
+
+    } else {
+        file = ngx_cycle->conf_prefix;
+    }
+
     options.file.start = file.data;
     options.file.length = file.len;
 
     jmcf->vm = njs_vm_create(&options);
     if (jmcf->vm == NULL) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "failed to create JS VM");
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "failed to create js VM");
         return NGX_CONF_ERROR;
     }
 
@@ -2428,12 +2893,12 @@ ngx_http_js_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     cln->handler = ngx_http_js_cleanup_vm;
     cln->data = jmcf->vm;
 
-    path.start = ngx_cycle->prefix.data;
-    path.length = ngx_cycle->prefix.len;
+    path.start = ngx_cycle->conf_prefix.data;
+    path.length = ngx_cycle->conf_prefix.len;
 
     rc = njs_vm_add_path(jmcf->vm, &path);
     if (rc != NJS_OK) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "failed to add path");
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "failed to add \"js_path\"");
         return NGX_CONF_ERROR;
     }
 
@@ -2441,7 +2906,7 @@ ngx_http_js_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         m = jmcf->paths->elts;
 
         for (i = 0; i < jmcf->paths->nelts; i++) {
-            if (ngx_conf_full_name(cf->cycle, &m[i], 0) != NGX_OK) {
+            if (ngx_conf_full_name(cf->cycle, &m[i], 1) != NGX_OK) {
                 return NGX_CONF_ERROR;
             }
 
@@ -2450,7 +2915,8 @@ ngx_http_js_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
             rc = njs_vm_add_path(jmcf->vm, &path);
             if (rc != NJS_OK) {
-                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "failed to add path");
+                ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                              "failed to add \"js_path\"");
                 return NGX_CONF_ERROR;
             }
         }
@@ -2459,29 +2925,182 @@ ngx_http_js_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     proto = njs_vm_external_prototype(jmcf->vm, ngx_http_js_ext_request,
                                       njs_nitems(ngx_http_js_ext_request));
     if (proto == NULL) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "failed to add request proto");
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                      "failed to add js request proto");
         return NGX_CONF_ERROR;
     }
 
     jmcf->req_proto = proto;
+    end = start + size;
 
     rc = njs_vm_compile(jmcf->vm, &start, end);
 
     if (rc != NJS_OK) {
+        njs_value_assign(&exception, njs_vm_retval(jmcf->vm));
         njs_vm_retval_string(jmcf->vm, &text);
 
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "%*s, included",
-                           text.length, text.start);
+        if (jmcf->include.len != 0) {
+            ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "%*s, included in %s:%ui",
+                          text.length, text.start, jmcf->file, jmcf->line);
+            return NGX_CONF_ERROR;
+        }
+
+        value = njs_vm_object_prop(jmcf->vm, njs_value_arg(&exception),
+                                   &file_name_key, &lvalue);
+        if (value == NULL) {
+            value = njs_vm_object_prop(jmcf->vm, njs_value_arg(&exception),
+                                       &line_number_key, &lvalue);
+
+            if (value != NULL) {
+                i = njs_value_number(value) - 1;
+
+                if (i < jmcf->imports->nelts) {
+                    import = jmcf->imports->elts;
+                    ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                                  "%*s, included in %s:%ui", text.length,
+                                  text.start, import[i].file, import[i].line);
+                    return NGX_CONF_ERROR;
+                }
+            }
+        }
+
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0, "%*s", text.length,
+                      text.start);
         return NGX_CONF_ERROR;
     }
 
     if (start != end) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "extra characters in js script: \"%*s\", included",
-                           end - start, start);
+        ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                      "extra characters in js script: \"%*s\"",
+                      end - start, start);
         return NGX_CONF_ERROR;
     }
+
+    return NGX_CONF_OK;
+}
+
+
+static char *
+ngx_http_js_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_http_js_main_conf_t *jmcf = conf;
+
+    if (jmcf->imports != NGX_CONF_UNSET_PTR) {
+        return "is incompatible with \"js_import\"";
+    }
+
+    jmcf->file = cf->conf_file->file.name.data;
+    jmcf->line = cf->conf_file->line;
+
+    return ngx_conf_set_str_slot(cf, cmd, conf);
+}
+
+
+static char *
+ngx_http_js_import(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_http_js_main_conf_t *jmcf = conf;
+
+    u_char                *p, *end, c;
+    ngx_int_t              from;
+    ngx_str_t             *value, name, path;
+    ngx_http_js_import_t  *import;
+
+    if (jmcf->include.len != 0) {
+        return "is incompatible with \"js_include\"";
+    }
+
+    value = cf->args->elts;
+    from = (cf->args->nelts == 4);
+
+    if (from) {
+        if (ngx_strcmp(value[2].data, "from") != 0) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "invalid parameter \"%V\"", &value[2]);
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    name = value[1];
+    path = (from ? value[3] : value[1]);
+
+    if (!from) {
+        end = name.data + name.len;
+
+        for (p = end - 1; p >= name.data; p--) {
+            if (*p == '/') {
+                break;
+            }
+        }
+
+        name.data = p + 1;
+        name.len = end - p - 1;
+
+        if (name.len < 3
+            || ngx_memcmp(&name.data[name.len - 3], ".js", 3) != 0)
+        {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "cannot extract export name from file path "
+                               "\"%V\", use extended \"from\" syntax", &path);
+            return NGX_CONF_ERROR;
+        }
+
+        name.len -= 3;
+    }
+
+    if (name.len == 0) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "empty export name");
+        return NGX_CONF_ERROR;
+    }
+
+    p = name.data;
+    end = name.data + name.len;
+
+    while (p < end) {
+        c = ngx_tolower(*p);
+
+        if (*p != '_' && (c < 'a' || c > 'z')) {
+            if (p == name.data) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "cannot start "
+                                   "with \"%c\" in export name \"%V\"", *p,
+                                   &name);
+                return NGX_CONF_ERROR;
+            }
+
+            if (*p < '0' || *p > '9') {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid character "
+                                   "\"%c\" in export name \"%V\"", *p,
+                                   &name);
+                return NGX_CONF_ERROR;
+            }
+        }
+
+        p++;
+    }
+
+    if (ngx_strchr(path.data, '\'') != NULL) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid character \"'\" "
+                           "in file path \"%V\"", &path);
+        return NGX_CONF_ERROR;
+    }
+
+    if (jmcf->imports == NGX_CONF_UNSET_PTR) {
+        jmcf->imports = ngx_array_create(cf->pool, 4,
+                                         sizeof(ngx_http_js_import_t));
+        if (jmcf->imports == NULL) {
+            return NGX_CONF_ERROR;
+        }
+    }
+
+    import = ngx_array_push(jmcf->imports);
+    if (import == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    import->name = name;
+    import->path = path;
+    import->file = cf->conf_file->file.name.data;
+    import->line = cf->conf_file->line;
 
     return NGX_CONF_OK;
 }
@@ -2559,10 +3178,14 @@ ngx_http_js_create_main_conf(ngx_conf_t *cf)
      * set by ngx_pcalloc():
      *
      *     conf->vm = NULL;
+     *     conf->include = { 0, NULL };
+     *     conf->file = NULL;
+     *     conf->line = 0;
      *     conf->req_proto = NULL;
      */
 
     conf->paths = NGX_CONF_UNSET_PTR;
+    conf->imports = NGX_CONF_UNSET_PTR;
 
     return conf;
 }

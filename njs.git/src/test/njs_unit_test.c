@@ -7231,6 +7231,12 @@ static njs_unit_test_t  njs_test[] =
                        "{ return '|'+s+'|'+o+'|'+m+'|'+p+'|' })"),
       njs_str("abc|abcdefghdijklm|3|d|d|efghdijklm") },
 
+    { njs_str("'abc'.replace(/b/, ()=>1)"),
+      njs_str("a1c") },
+
+    { njs_str("var n = 0; 'abbbc'.replace(/b/g, function() {return ++n;})"),
+      njs_str("a123c") },
+
     { njs_str("'abcdefghdijklm'.replace(/x/, 'X')"),
       njs_str("abcdefghdijklm") },
 
@@ -7390,6 +7396,15 @@ static njs_unit_test_t  njs_test[] =
 
     { njs_str("RegExp('\\\\0').source[1]"),
       njs_str("0") },
+
+    { njs_str("RegExp(undefined, 'g').global"),
+      njs_str("true") },
+
+    { njs_str("RegExp('', 'g').global"),
+      njs_str("true") },
+
+    { njs_str("var x; RegExp(x, 'g')"),
+      njs_str("/(?:)/g") },
 
     { njs_str("']'.match(/]/)"),
       njs_str("]") },
@@ -10174,6 +10189,41 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("this.a = ()=>1; a()"),
       njs_str("1") },
 
+    { njs_str("var a = 1; this.a = 42; a"),
+      njs_str("42") },
+
+    { njs_str("var a = 1; global.a = 42; a"),
+      njs_str("42") },
+
+    { njs_str("var a = 1; globalThis.a = 42; a"),
+      njs_str("42") },
+
+    { njs_str("global.a = 1; globalThis.a"),
+      njs_str("1") },
+
+    { njs_str("var a = {}; globalThis.a === a"),
+      njs_str("true") },
+
+    { njs_str("globalThis.a = 1; var a; a"),
+      njs_str("1") },
+
+    { njs_str("var count = 0; function f() {return ++count}; [f(), global.f()]"),
+      njs_str("1,2") },
+
+    { njs_str("Object.defineProperty(global, 'a', {value:1}); a"),
+      njs_str("1") },
+
+    { njs_str("Object.defineProperty(global, 'a', {get:()=>123}); a"),
+      njs_str("123") },
+
+    { njs_str("Object.defineProperties(global, {a:{value:1}, b:{value:2}}); [a,b]"),
+      njs_str("1,2") },
+
+#if 0 /* FIXME: for scope. */
+    { njs_str("var r1 = global.a; for (var a = 1; false;) {}; [r1, global.a]"),
+      njs_str(",") },
+#endif
+
     { njs_str("var global = this;"
               "function isImmutableConstant(v) {"
               "    var d = Object.getOwnPropertyDescriptor(global, v);"
@@ -11454,6 +11504,10 @@ static njs_unit_test_t  njs_test[] =
 
     { njs_str("(new Function('return this'))() === globalThis"),
       njs_str("true") },
+
+    { njs_str("var f = Function.call(this, 'return this.a');"
+              "var r1 = f(); var a = 1; var r2 = f(); [r1,r2]"),
+      njs_str(",1") },
 
     { njs_str("(new Function('a', 'return a')).length"),
       njs_str("1") },
@@ -16845,11 +16899,11 @@ static njs_unit_test_t  njs_shared_test[] =
       njs_str("{a:'1',b:42,c:{d:1024}}") },
 
     { njs_str("njs.dump($shared.props)"),
-      njs_str("{a:'4294967295',b:42,c:{d:4294967294}}") },
+      njs_str("{a:'11',b:42,c:{d:13}}") },
 
     { njs_str("var r = JSON.parse(JSON.stringify($shared));"
               "[r.uri, r.host, r.props.a, njs.dump(r.vars), njs.dump(r.consts), r.header['02']]"),
-      njs_str("shared,АБВГДЕЁЖЗИЙ,4294967295,{},{},02|АБВ") },
+      njs_str("shared,АБВГДЕЁЖЗИЙ,11,{},{},02|АБВ") },
 
     { njs_str("$shared.toString()"),
       njs_str("[object External]") },
@@ -16864,7 +16918,7 @@ static njs_unit_test_t  njs_shared_test[] =
       njs_str("1") },
 
     { njs_str("$shared.method = function() {return this.props.a;}; $shared.method()"),
-      njs_str("4294967295") },
+      njs_str("11") },
 
     { njs_str("var r; for (var i = 0; i < 2**10; i++) {r = $r.create('XXX').uri;}"),
       njs_str("undefined") },
@@ -17107,7 +17161,7 @@ njs_unit_test(njs_unit_test_t tests[], size_t num, const char *name,
             njs_printf("\"%V\"\n", &tests[i].script);
         }
 
-        njs_memzero(&options, sizeof(njs_vm_opt_t));
+        njs_vm_opt_init(&options);
 
         options.module = opts->module;
         options.unsafe = opts->unsafe;
@@ -17339,7 +17393,7 @@ njs_vm_json_test(njs_opts_t *opts, njs_stat_t *stat)
 
     for (i = 0; i < njs_nitems(tests); i++) {
 
-        memset(&options, 0, sizeof(njs_vm_opt_t));
+        njs_vm_opt_init(&options);
         options.init = 1;
 
         vm = njs_vm_create(&options);
@@ -17373,8 +17427,8 @@ njs_vm_json_test(njs_opts_t *opts, njs_stat_t *stat)
         }
 
         args[0] = vm->retval;
-        args[1] = *njs_vm_value(vm, &fname);
-        args[2] = *njs_vm_value(vm, &iname);
+        njs_vm_value(vm, &fname, &args[1]);
+        njs_vm_value(vm, &iname, &args[2]);
 
         ret = njs_vm_json_stringify(vm, args, 3);
         if (ret != NJS_OK) {
@@ -17419,6 +17473,161 @@ done:
     }
 
     njs_unit_test_report("VM json API tests", &prev, stat);
+
+    if (vm != NULL) {
+        njs_vm_destroy(vm);
+    }
+
+    return ret;
+}
+
+
+static njs_int_t
+njs_vm_value_test(njs_opts_t *opts, njs_stat_t *stat)
+{
+    njs_vm_t      *vm;
+    njs_int_t     ret;
+    njs_str_t     s, *script, path;
+    njs_uint_t    i;
+    njs_bool_t    success;
+    njs_stat_t    prev;
+    njs_vm_opt_t  options;
+
+    static struct {
+        njs_str_t   script;
+        njs_str_t   path;
+        njs_str_t   ret;
+    } tests[] = {
+        {
+          .script = njs_str("var o = {a:1}"),
+          .path = njs_str("o.a"),
+          .ret = njs_str("1"),
+        },
+
+        {
+          .script = njs_str("var aaaaabbbbbcccccddddd = {e:2}"),
+          .path = njs_str("aaaaabbbbbcccccddddd.e"),
+          .ret = njs_str("2"),
+        },
+
+        {
+          .script = njs_str("var o = {a:{b:3}}"),
+          .path = njs_str("o.a.b"),
+          .ret = njs_str("3"),
+        },
+
+        {
+          .script = njs_str("var o = 1"),
+          .path = njs_str("o.a"),
+          .ret = njs_str("undefined"),
+        },
+
+        {
+          .script = njs_str(""),
+          .path = njs_str("o"),
+          .ret = njs_str("undefined"),
+        },
+
+        {
+          .script = njs_str("var o = {'':1}"),
+          .path = njs_str("."),
+          .ret = njs_str("TypeError: empty path element"),
+        },
+
+        {
+          .script = njs_str("var o = {'':1}"),
+          .path = njs_str("o."),
+          .ret = njs_str("TypeError: empty path element"),
+        },
+        {
+          .script = njs_str("var o = {'':1}"),
+          .path = njs_str("o.."),
+          .ret = njs_str("TypeError: empty path element"),
+        },
+    };
+
+    vm = NULL;
+
+    prev = *stat;
+
+    ret = NJS_ERROR;
+
+    for (i = 0; i < njs_nitems(tests); i++) {
+
+        memset(&options, 0, sizeof(njs_vm_opt_t));
+        options.init = 1;
+
+        vm = njs_vm_create(&options);
+        if (vm == NULL) {
+            njs_printf("njs_vm_create() failed\n");
+            goto done;
+        }
+
+        script = &tests[i].script;
+
+        ret = njs_vm_compile(vm, &script->start,
+                             script->start + script->length);
+
+        if (ret != NJS_OK) {
+            njs_printf("njs_vm_compile() failed\n");
+            goto done;
+        }
+
+        ret = njs_vm_start(vm);
+        if (ret != NJS_OK) {
+            njs_printf("njs_vm_run() failed\n");
+            goto done;
+        }
+
+        path = tests[i].path;
+
+        path.start = njs_mp_alloc(vm->mem_pool, path.length);
+        if (path.start == NULL) {
+            njs_printf("njs_mp_alloc() failed\n");
+            goto done;
+        }
+
+        memcpy(path.start, tests[i].path.start, path.length);
+
+        ret = njs_vm_value(vm, &path, &vm->retval);
+
+        if (njs_vm_retval_string(vm, &s) != NJS_OK) {
+            njs_printf("njs_vm_retval_string() failed\n");
+            goto done;
+        }
+
+        success = njs_strstr_eq(&tests[i].ret, &s);
+
+        if (!success) {
+            njs_printf("njs_vm_value_test(\"%V\")\n"
+                       "expected: \"%V\"\n     got: \"%V\"\n", script,
+                       &tests[i].ret, &s);
+
+            stat->failed++;
+
+        } else {
+            stat->passed++;
+        }
+
+        njs_vm_destroy(vm);
+        vm = NULL;
+
+    }
+
+    ret = NJS_OK;
+
+done:
+
+    if (ret != NJS_OK) {
+        if (njs_vm_retval_string(vm, &s) != NJS_OK) {
+            njs_printf("njs_vm_retval_string() failed\n");
+
+        } else {
+            njs_printf("%V\n", &s);
+        }
+    }
+
+    njs_unit_test_report("njs_vm_value() tests", &prev, stat);
 
     if (vm != NULL) {
         njs_vm_destroy(vm);
@@ -17813,7 +18022,7 @@ njs_api_test(njs_opts_t *opts, njs_stat_t *stat)
     };
 
     vm = NULL;
-    njs_memzero(&options, sizeof(njs_vm_opt_t));
+    njs_vm_opt_init(&options);
 
     prev = *stat;
 
@@ -17927,6 +18136,11 @@ main(int argc, char **argv)
     }
 
     ret = njs_vm_json_test(&opts, &stat);
+    if (ret != NJS_OK) {
+        return ret;
+    }
+
+    ret = njs_vm_value_test(&opts, &stat);
     if (ret != NJS_OK) {
         return ret;
     }

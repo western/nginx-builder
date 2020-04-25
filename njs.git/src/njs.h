@@ -220,6 +220,7 @@ typedef struct {
 } njs_vm_opt_t;
 
 
+NJS_EXPORT void njs_vm_opt_init(njs_vm_opt_t *options);
 NJS_EXPORT njs_vm_t *njs_vm_create(njs_vm_opt_t *options);
 NJS_EXPORT void njs_vm_destroy(njs_vm_t *vm);
 
@@ -294,12 +295,15 @@ NJS_EXPORT void njs_disassemble(u_char *start, u_char *end);
 
 NJS_EXPORT njs_int_t njs_vm_bind(njs_vm_t *vm, const njs_str_t *var_name,
     const njs_value_t *value, njs_bool_t shared);
-NJS_EXPORT const njs_value_t *njs_vm_value(njs_vm_t *vm, const njs_str_t *name);
+NJS_EXPORT njs_int_t njs_vm_value(njs_vm_t *vm, const njs_str_t *path,
+    njs_value_t *retval);
 NJS_EXPORT njs_function_t *njs_vm_function(njs_vm_t *vm, const njs_str_t *name);
 
 NJS_EXPORT njs_value_t *njs_vm_retval(njs_vm_t *vm);
 NJS_EXPORT void njs_vm_retval_set(njs_vm_t *vm, const njs_value_t *value);
 
+/*  Gets string value, no copy. */
+NJS_EXPORT void njs_value_string_get(njs_value_t *value, njs_str_t *dst);
 /*
  * Sets a byte string value.
  *   start data is not copied and should not be freed.
@@ -356,15 +360,21 @@ NJS_EXPORT njs_int_t njs_value_is_number(const njs_value_t *value);
 NJS_EXPORT njs_int_t njs_value_is_valid_number(const njs_value_t *value);
 NJS_EXPORT njs_int_t njs_value_is_string(const njs_value_t *value);
 NJS_EXPORT njs_int_t njs_value_is_object(const njs_value_t *value);
+NJS_EXPORT njs_int_t njs_value_is_array(const njs_value_t *value);
 NJS_EXPORT njs_int_t njs_value_is_function(const njs_value_t *value);
 
 NJS_EXPORT njs_int_t njs_vm_object_alloc(njs_vm_t *vm, njs_value_t *retval,
     ...);
 NJS_EXPORT njs_value_t *njs_vm_object_prop(njs_vm_t *vm,
-    const njs_value_t *value, const njs_str_t *key);
+    njs_value_t *value, const njs_str_t *key, njs_opaque_value_t *retval);
 
 NJS_EXPORT njs_int_t njs_vm_array_alloc(njs_vm_t *vm, njs_value_t *retval,
     uint32_t spare);
+NJS_EXPORT njs_int_t njs_vm_array_length(njs_vm_t *vm, njs_value_t *value,
+    int64_t *length);
+NJS_EXPORT njs_value_t *njs_vm_array_start(njs_vm_t *vm, njs_value_t *value);
+NJS_EXPORT njs_value_t *njs_vm_array_prop(njs_vm_t *vm,
+    njs_value_t *value, int64_t index, njs_opaque_value_t *retval);
 NJS_EXPORT njs_value_t *njs_vm_array_push(njs_vm_t *vm, njs_value_t *value);
 
 NJS_EXPORT njs_int_t njs_vm_json_parse(njs_vm_t *vm, njs_value_t *args,
