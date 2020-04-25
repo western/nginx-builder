@@ -217,6 +217,7 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --add-module=../rds-csv-nginx-module.git/ \\
 --add-module=../drizzle-nginx-module.git/ \\
 --add-module=../ngx_postgres.git/ \\
+--add-module=../njs.git/nginx/ \\
 --add-module=../stream-lua-nginx-module.git/ \\
 --add-module=../xss-nginx-module.git/ \\
 --add-module=../nginx-rtmp-module.git/ \\
