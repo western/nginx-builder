@@ -20,7 +20,8 @@ drizzle7-2011.07.21.tar.gz
 
 ## new
 
-* OpenSSL_1_1_1g
+* njs 0.4.0
+* lua-resty-mysql 0.22
 
 ## modules
 
@@ -59,7 +60,7 @@ v0.09
 * github.com/openresty/ngx_postgres.git
 1.0
 * github.com/nginx/njs.git
-0.3.9
+0.4.0
 * github.com/openresty/stream-lua-nginx-module.git
 v0.0.7
 * github.com/openresty/xss-nginx-module.git
@@ -79,7 +80,7 @@ v0.28rc1
 * github.com/cloudflare/lua-resty-cookie.git
 v0.1.0
 * github.com/openresty/lua-resty-mysql.git
-v0.21
+v0.22
 * github.com/openresty/lua-ssl-nginx-module.git
 v0.01rc3
 * github.com/openresty/lua-resty-signal.git
@@ -100,6 +101,7 @@ v0.10
 v0.07
 * github.com/openresty/lua-resty-upstream-healthcheck.git
 v0.06
+
 
 ## generate ssl keys
 
