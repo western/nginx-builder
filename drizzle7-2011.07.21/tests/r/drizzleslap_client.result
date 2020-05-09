@@ -1,3 +1,0 @@
-run slap
-pipe into drizzle command line utility
-remove tmp file

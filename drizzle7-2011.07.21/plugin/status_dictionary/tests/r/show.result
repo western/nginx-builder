@@ -1,3 +1,0 @@
-use data_dictionary;
-SHOW STATUS;
-SHOW VARIABLES;

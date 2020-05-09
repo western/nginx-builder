@@ -1,2 +1,0 @@
-SELECT SHOW_SCHEMA_PROTO('not_exists');
-ERROR 42000: Unknown schema 'not_exists'

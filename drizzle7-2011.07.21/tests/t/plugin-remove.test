@@ -1,3 +1,0 @@
---error ER_SP_DOES_NOT_EXIST
-select length("test string");
-

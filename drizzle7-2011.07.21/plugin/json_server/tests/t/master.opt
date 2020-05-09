@@ -1,1 +1,0 @@
---plugin-add=http_functions --plugin-add=json-server --json-server.port=$JSON_SERVER_PORT

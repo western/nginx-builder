@@ -1,2 +1,0 @@
-select length("test string");
-ERROR 42000: FUNCTION length does not exist

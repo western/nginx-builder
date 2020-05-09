@@ -1,3 +1,0 @@
-CREATE TABLE t1 (a UUID);
-show create table t1;
-DROP TABLE t1;

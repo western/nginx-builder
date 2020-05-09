@@ -1,1 +1,0 @@
---exec $TOP_SRCDIR/plugin/mysql_protocol/prototest/drizzle_prototest -p $MASTER_MYPORT

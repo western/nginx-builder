@@ -1,2 +1,0 @@
-SHOW CREATE TABLE test.invalid_table_collation;
-

@@ -1,3 +1,0 @@
-# Make sure that we exist/that the basics are working correctly.
-
-select * from data_dictionary.plugins WHERE PLUGIN_TYPE="storageengine" AND PLUGIN_NAME="schema";

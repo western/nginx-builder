@@ -1,5 +1,0 @@
---replace_column 1 #
-SELECT USER();
-
---replace_column 1 #
-SELECT CURRENT_USER();

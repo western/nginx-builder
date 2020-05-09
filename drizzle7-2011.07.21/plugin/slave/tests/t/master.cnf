@@ -1,2 +1,0 @@
-[test_servers]
-servers = [[--innodb.replication-log],[--plugin-add=slave --slave.config-file=$MASTER_SERVER_SLAVE_CONFIG]]

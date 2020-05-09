@@ -1,3 +1,0 @@
-select count(*) from data_dictionary.INNODB_INTERNAL_TABLES;
-count(*)
-3

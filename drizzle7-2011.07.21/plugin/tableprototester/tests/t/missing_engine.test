@@ -1,4 +1,0 @@
-
-SHOW TABLES like 't1';
-
-SHOW CREATE TABLE t1;
