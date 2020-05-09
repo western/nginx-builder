@@ -7,26 +7,28 @@ PARENTF=`pwd`
 NGINXV='nginx-1.18.0'
 IS_LOCAL=1
 IS_PAUSED=0
+IS_GET_ONLY=1
 
 
 function main {
     notice "builder for $NGINXV"
     notice "from parent folder $PARENTF"
     
-    if [ $IS_LOCAL == 1 ]; then
-        warn "run for LOCAL operations"
-    fi
+    warn "IS_LOCAL $IS_LOCAL"
+    warn "IS_PAUSED $IS_PAUSED"
+    warn "IS_GET_ONLY $IS_GET_ONLY"
     
     rm versions
     
     #root_prepare
     #postgres_get
     
-    repo_get
-    luajit2_git_prepare
-    lua_addition_prepare
+    etc_src
+    ngx_module
+    luajit2_prepare
+    lua_src
     openssl_get
-    nginx_get
+    ngx_src
     #make_configure
     
     #make_nginx_service
@@ -42,56 +44,10 @@ function prepare_for_archive {
     
     notice "prepare_for_archive"
     
-    for mfold in echo-nginx-module.git form-input-nginx-module.git headers-more-nginx-module.git \
-        lua-nginx-module.git memc-nginx-module.git naxsi.git sregex.git \
-        replace-filter-nginx-module.git drizzle-nginx-module.git rds-json-nginx-module.git rds-csv-nginx-module.git \
-        ngx_postgres.git njs.git stream-lua-nginx-module.git xss-nginx-module.git nginx-rtmp-module.git \
-        nginx-upload-module.git ngx_cache_purge.git ngx_devel_kit.git \
-        redis2-nginx-module.git set-misc-nginx-module.git
-    do
-        warn "remove [$mfold/.git] folder"
-        rm -rf "$mfold/.git"
-    done
+    find . -type d -name '.git' -not -path "./.git" | xargs rm -rf
+    find . -type d -name '.git' -not -path "./.git"
     
-    if [ $IS_LOCAL == 1 ]; then
-        pushd 'opt'
-            for mfold in lua-cjson.git lua-resty-cookie.git lua-resty-core.git lua-resty-lrucache.git \
-                lua-resty-mysql.git lua-resty-redis.git lua-ssl-nginx-module.git \
-                lua-resty-signal.git lua-tablepool.git lua-resty-shell.git \
-                lua-resty-limit-traffic.git lua-resty-lock.git lua-resty-string.git lua-resty-upload.git \
-                lua-resty-websocket.git lua-resty-upstream-healthcheck.git \
-                luajit2.git
-            do
-                warn "remove [$mfold/.git] folder"
-                rm -rf "$mfold/.git"
-            done
-        popd
-    fi
-    
-    pushd 'opt/luajit2.git'
-        warn `pwd`
-        rm -rf build ; mkdir build
-        make clean
-    popd
-    pushd 'sregex.git'
-        warn `pwd`
-        rm -rf build ; mkdir build
-        make clean
-    popd
-    pushd 'opt/lua-cjson.git'
-        warn `pwd`
-        make clean
-    popd
-    
-    
-    rm -rf $NGINXV
-    tar xf $NGINXV.tar.gz
-    
-    rm -rf drizzle7-2011.07.21
-    tar xf drizzle7-2011.07.21.tar.gz
-    
-    rm -rf openssl-OpenSSL_1_1_1g
-    tar xf OpenSSL_1_1_1g.tar.gz
+    cd $PARENTF
 }
 
 # ------------------------------------------------------------------------------
@@ -280,135 +236,159 @@ function postgres_get {
 
 # ------------------------------------------------------------------------------
 
-function repo_get {
+function etc_src {
     
-    notice "repo_get"
+    notice "etc_src"
     
-    get_github 'openresty' 'memc-nginx-module.git'
-    get_github 'openresty' 'lua-nginx-module.git' 'v0.10.15'
-    get_github 'simplresty' 'ngx_devel_kit.git'
-    get_github 'openresty' 'redis2-nginx-module.git'
-    get_github 'openresty' 'echo-nginx-module.git'
-    get_github 'calio' 'form-input-nginx-module.git'
-    get_github 'openresty' 'set-misc-nginx-module.git'
-    get_github 'Austinb' 'nginx-upload-module.git'
-    get_github 'FRiCKLE' 'ngx_cache_purge.git'
-    get_github 'openresty' 'headers-more-nginx-module.git'
-    get_github 'nbs-system' 'naxsi.git'
+    mkdir etc_src ; cd etc_src
+    
     get_github 'openresty' 'sregex.git'
     
-    pushd 'sregex.git'
-        make clean
-        rm -rf build ; mkdir build
-        
-        if [ $IS_LOCAL == 1 ]; then
-            make -j4 PREFIX=$PARENTF/sregex.git/build
-            make install PREFIX=$PARENTF/sregex.git/build
-        else
-            make -j4
-            make install
-        fi
-        ldconfig
-    popd
-    
-    get_github 'openresty' 'replace-filter-nginx-module.git'
-    get_github 'openresty' 'drizzle-nginx-module.git'
-    
-    if [ ! -f drizzle7-2011.07.21.tar.gz ]; then
-        wget https://openresty.org/download/drizzle7-2011.07.21.tar.gz
+    if [ $IS_GET_ONLY == 0 ]; then
+        pushd 'sregex.git'
+            make clean
+            rm -rf build ; mkdir build
+            
+            if [ $IS_LOCAL == 1 ]; then
+                make -j4 PREFIX=$PARENTF/etc_src/sregex.git/build
+                make install PREFIX=$PARENTF/etc_src/sregex.git/build
+            else
+                make -j4
+                make install
+            fi
+            ldconfig
+        popd
     fi
     
-    tar xf drizzle7-2011.07.21.tar.gz
+    get_arch 'https://openresty.org/download/drizzle7-2011.07.21.tar.gz' 'drizzle7-2011.07.21.tar.gz' 'drizzle7-2011.07.21'
     
-    pushd 'drizzle7-2011.07.21'
-        rm -rf build ; mkdir build
-        
-        if [ $IS_LOCAL == 1 ]; then
-            ./configure --without-server --prefix=$PARENTF/drizzle7-2011.07.21/build
-        else
-            ./configure --without-server
-        fi
-        
-        make libdrizzle-1.0 -j4
-        make install-libdrizzle-1.0 -j4
-        ldconfig
-    popd
-    
-    get_github 'openresty' 'rds-json-nginx-module.git'
-    get_github 'openresty' 'rds-csv-nginx-module.git'
-    get_github 'openresty' 'ngx_postgres.git'
-    get_github 'nginx' 'njs.git'
-    
-    get_github 'openresty' 'stream-lua-nginx-module.git' 'v0.0.7'
-    get_github 'openresty' 'xss-nginx-module.git'
-    get_github 'arut' 'nginx-rtmp-module.git'
-    
-}
-
-# ------------------------------------------------------------------------------
-
-function luajit2_git_prepare {
-    
-    notice "luajit2_git_prepare"
-    
-    if [ $IS_LOCAL == 1 ]; then
-        mkdir opt ; cd opt
-    else
-        cd /opt
+    if [ $IS_GET_ONLY == 0 ]; then
+        pushd 'drizzle7-2011.07.21'
+            rm -rf build ; mkdir build
+            
+            if [ $IS_LOCAL == 1 ]; then
+                ./configure --without-server --prefix=$PARENTF/etc_src/drizzle7-2011.07.21/build
+            else
+                ./configure --without-server
+            fi
+            
+            make libdrizzle-1.0 -j4
+            make install-libdrizzle-1.0 -j4
+            ldconfig
+        popd
     fi
     
-    get_github 'openresty' 'luajit2.git'
-    pushd 'luajit2.git'
-        
-        make clean
-        mkdir build
-        
-        if [ $IS_LOCAL == 1 ]; then
-            make -j4 PREFIX=$PARENTF/opt/luajit2.git/build
-            make install PREFIX=$PARENTF/opt/luajit2.git/build
-        else
-            make -j4 PREFIX=/opt/luajit2.git/build
-            make install PREFIX=/opt/luajit2.git/build
-        fi
-    popd
+    get_github 'giltene' 'wrk2.git'
     
     cd $PARENTF
 }
 
 # ------------------------------------------------------------------------------
 
-function lua_addition_prepare {
+function ngx_module {
     
-    notice "lua_addition_prepare"
+    notice "ngx_module"
+    
+    mkdir ngx_module ; cd ngx_module
+    
+    get_github 'openresty' 'memc-nginx-module.git'
+    get_github 'openresty' 'lua-nginx-module.git' 'v0.10.16rc5'
+    get_github 'simplresty' 'ngx_devel_kit.git'
+    get_github 'openresty' 'redis2-nginx-module.git'
+    get_github 'openresty' 'echo-nginx-module.git'
+    get_github 'calio'     'form-input-nginx-module.git'
+    get_github 'openresty' 'set-misc-nginx-module.git'
+    get_github 'Austinb'   'nginx-upload-module.git'
+    get_github 'FRiCKLE'   'ngx_cache_purge.git'
+    get_github 'openresty' 'headers-more-nginx-module.git'
+    get_github 'nbs-system' 'naxsi.git'
+    
+    get_github 'openresty' 'replace-filter-nginx-module.git'
+    get_github 'openresty' 'rds-json-nginx-module.git'
+    get_github 'openresty' 'rds-csv-nginx-module.git'
+    
+    get_github 'openresty' 'drizzle-nginx-module.git'
+    
+    get_github 'openresty' 'ngx_postgres.git'
+    get_github 'nginx'     'njs.git'
+    
+    get_github 'openresty' 'stream-lua-nginx-module.git' 'v0.0.7'
+    get_github 'openresty' 'xss-nginx-module.git'
+    
+    get_github 'arut' 'nginx-rtmp-module.git'
+    get_github 'arut' 'nginx-ts-module.git'
+    
+    cd $PARENTF
+}
+
+# ------------------------------------------------------------------------------
+
+function luajit2_prepare {
+    
+    notice "luajit2_prepare"
+    
+    if [ $IS_LOCAL == 1 ]; then
+        mkdir lua_src ; cd lua_src
+    else
+        mkdir -p /opt/lua_src ; cd /opt/lua_src
+    fi
+    
+    get_github 'openresty' 'luajit2.git'
+    if [ $IS_GET_ONLY == 0 ]; then
+        pushd 'luajit2.git'
+            
+            make clean
+            mkdir build
+            
+            if [ $IS_LOCAL == 1 ]; then
+                make -j4 PREFIX=$PARENTF/lua_src/luajit2.git/build
+                make install PREFIX=$PARENTF/lua_src/luajit2.git/build
+            else
+                make -j4 PREFIX=/opt/lua_src/luajit2.git/build
+                make install PREFIX=/opt/lua_src/luajit2.git/build
+            fi
+        popd
+    fi
+    
+    cd $PARENTF
+}
+
+# ------------------------------------------------------------------------------
+
+function lua_src {
+    
+    notice "lua_src"
     
     
     if [ $IS_LOCAL == 1 ]; then
-        mkdir opt ; cd opt
+        mkdir lua_src ; cd lua_src
     else
-        cd /opt
+        mkdir -p /opt/lua_src ; cd /opt/lua_src
     fi
     
     get_github 'openresty' 'lua-resty-core.git' 'v0.1.17'
     get_github 'openresty' 'lua-resty-lrucache.git' 'v0.09'
     get_github 'openresty' 'lua-cjson.git' '2.1.0.7'
     
-    local LUAJIT2_SRC=""
-    if [ $IS_LOCAL == 1 ]; then
-        LUAJIT2_SRC="$PARENTF/opt/luajit2.git/src"
-    else
-        LUAJIT2_SRC="/opt/luajit2.git/src"
-    fi
-    
-    pushd 'lua-cjson.git'
-        echo
-        echo "export LUA_INCLUDE_DIR=\"$LUAJIT2_SRC\" && make -j4"
-        echo
-        export LUA_INCLUDE_DIR="$LUAJIT2_SRC" && make -j4
-        
-        if [ $IS_PAUSED == 1 ]; then
-            read -p "Press [Enter] key to continue..."
+    if [ $IS_GET_ONLY == 0 ]; then
+        local LUAJIT2_SRC=""
+        if [ $IS_LOCAL == 1 ]; then
+            LUAJIT2_SRC="$PARENTF/lua_src/luajit2.git/src"
+        else
+            LUAJIT2_SRC="/opt/lua_src/luajit2.git/src"
         fi
-    popd
+        
+        pushd 'lua-cjson.git'
+            echo
+            echo "export LUA_INCLUDE_DIR=\"$LUAJIT2_SRC\" && make -j4"
+            echo
+            export LUA_INCLUDE_DIR="$LUAJIT2_SRC" && make -j4
+            
+            if [ $IS_PAUSED == 1 ]; then
+                read -p "Press [Enter] key to continue..."
+            fi
+        popd
+    fi
     
     get_github 'openresty' 'lua-resty-redis.git'
     get_github 'cloudflare' 'lua-resty-cookie.git'
@@ -416,10 +396,12 @@ function lua_addition_prepare {
     get_github 'openresty' 'lua-ssl-nginx-module.git'
     
     get_github 'openresty' 'lua-resty-signal.git' 'v0.02'
-    pushd 'lua-resty-signal.git'
-        make clean
-        make
-    popd
+    if [ $IS_GET_ONLY == 0 ]; then
+        pushd 'lua-resty-signal.git'
+            make clean
+            make
+        popd
+    fi
     get_github 'openresty' 'lua-tablepool.git' 'v0.01'
     get_github 'openresty' 'lua-resty-shell.git' 'v0.02'
     
@@ -433,36 +415,36 @@ function lua_addition_prepare {
     echo
     notice "save these strings:"
     if [ $IS_LOCAL == 1 ]; then
-        local LB="$PARENTF/opt/lua-resty-core.git/lib/?.lua;"
-        LB="$LB$PARENTF/opt/lua-resty-lrucache.git/lib/?.lua;"
-        LB="$LB$PARENTF/opt/lua-resty-redis.git/lib/?.lua;"
-        LB="$LB$PARENTF/opt/lua-resty-mysql.git/lib/?.lua;"
-        LB="$LB$PARENTF/opt/lua-ssl-nginx-module.git/lualib/?.lua;"
+        local LB="$PARENTF/lua_src/lua-resty-core.git/lib/?.lua;"
+        LB="$LB$PARENTF/lua_src/lua-resty-lrucache.git/lib/?.lua;"
+        LB="$LB$PARENTF/lua_src/lua-resty-redis.git/lib/?.lua;"
+        LB="$LB$PARENTF/lua_src/lua-resty-mysql.git/lib/?.lua;"
+        LB="$LB$PARENTF/lua_src/lua-ssl-nginx-module.git/lualib/?.lua;"
         
-        LB="$LB$PARENTF/opt/lua-resty-signal.git/lib/?.lua;"
-        LB="$LB$PARENTF/opt/lua-tablepool.git/lib/?.lua;"
-        LB="$LB$PARENTF/opt/lua-resty-shell.git/lib/?.lua;"
+        LB="$LB$PARENTF/lua_src/lua-resty-signal.git/lib/?.lua;"
+        LB="$LB$PARENTF/lua_src/lua-tablepool.git/lib/?.lua;"
+        LB="$LB$PARENTF/lua_src/lua-resty-shell.git/lib/?.lua;"
         
-        local CLB="$PARENTF/opt/lua-cjson.git/?.so;"
-        CLB="$CLB$PARENTF/opt/lua-resty-signal.git/?.so;"
+        local CLB="$PARENTF/lua_src/lua-cjson.git/?.so;"
+        CLB="$CLB$PARENTF/lua_src/lua-resty-signal.git/?.so;"
         
         echo "lua_package_path \"$LB;\";"
         echo "lua_package_cpath \"$CLB;\";"
         echo "lua_package_path \"$LB;\";" > "$PARENTF/lua_package_path"
         echo "lua_package_cpath \"$CLB;\";" >> "$PARENTF/lua_package_path"
     else
-        local LB="/opt/lua-resty-core.git/lib/?.lua;"
-        LB="$LB/opt/lua-resty-lrucache.git/lib/?.lua;"
-        LB="$LB/opt/lua-resty-redis.git/lib/?.lua;"
-        LB="$LB/opt/lua-resty-mysql.git/lib/?.lua;"
-        LB="$LB/opt/lua-ssl-nginx-module.git/lualib/?.lua;"
+        local LB="/opt/lua_src/lua-resty-core.git/lib/?.lua;"
+        LB="$LB/opt/lua_src/lua-resty-lrucache.git/lib/?.lua;"
+        LB="$LB/opt/lua_src/lua-resty-redis.git/lib/?.lua;"
+        LB="$LB/opt/lua_src/lua-resty-mysql.git/lib/?.lua;"
+        LB="$LB/opt/lua_src/lua-ssl-nginx-module.git/lualib/?.lua;"
         
-        LB="$LB/opt/lua-resty-signal.git/lib/?.lua;"
-        LB="$LB/opt/lua-tablepool.git/lib/?.lua;"
-        LB="$LB/opt/lua-resty-shell.git/lib/?.lua;"
+        LB="$LB/opt/lua_src/lua-resty-signal.git/lib/?.lua;"
+        LB="$LB/opt/lua_src/lua-tablepool.git/lib/?.lua;"
+        LB="$LB/opt/lua_src/lua-resty-shell.git/lib/?.lua;"
         
-        local CLB="/opt/lua-cjson.git/?.so;"
-        CLB="$CLB/opt/lua-resty-signal.git/?.so;"
+        local CLB="/opt/lua_src/lua-cjson.git/?.so;"
+        CLB="$CLB/opt/lua_src/lua-resty-signal.git/?.so;"
         
         echo "lua_package_path \"$LB;\";"
         echo "lua_package_cpath \"$CLB;\";"
@@ -484,13 +466,11 @@ function openssl_get {
     
     notice "openssl_get"
     
-    rm -rf openssl-OpenSSL_1_1_1g
+    mkdir etc_src ; cd etc_src
     
-    if [ ! -f OpenSSL_1_1_1g.tar.gz ]; then
-        wget https://github.com/openssl/openssl/archive/OpenSSL_1_1_1g.tar.gz
-    fi
+    get_arch 'https://github.com/openssl/openssl/archive/OpenSSL_1_1_1g.tar.gz' 'OpenSSL_1_1_1g.tar.gz' 'openssl-OpenSSL_1_1_1g'
     
-    tar xf OpenSSL_1_1_1g.tar.gz
+    cd $PARENTF
 }
 
 # ------------------------------------------------------------------------------
@@ -514,17 +494,16 @@ function openssl_generate_localhost {
 
 # ------------------------------------------------------------------------------
 
-function nginx_get {
+function ngx_src {
     
-    notice "nginx_get"
+    notice "ngx_src"
     
-    rm -rf $NGINXV
+    mkdir ngx_src ; cd ngx_src
     
-    if [ ! -f $NGINXV.tar.gz ]; then
-        wget https://nginx.org/download/$NGINXV.tar.gz
-    fi
+    get_arch "https://nginx.org/download/nginx-1.16.1.tar.gz" "nginx-1.16.1.tar.gz" "nginx-1.16.1"
+    get_arch "https://nginx.org/download/$NGINXV.tar.gz" "$NGINXV.tar.gz" $NGINXV
     
-    tar xf $NGINXV.tar.gz
+    cd $PARENTF
 }
 
 # ------------------------------------------------------------------------------
@@ -559,9 +538,9 @@ function make_configure {
         FASTCGI_TEMP_PATH="$PREFIX/fastcgi/"
         UWSGI_TEMP_PATH="$PREFIX/uwsgi/"
         SCGI_TEMP_PATH="$PREFIX/scgi/"
-        LUAJIT2_BUILD_LIB="$PARENTF/opt/luajit2.git/build/lib"
-        LUAJIT2_SRC="$PARENTF/opt/luajit2.git/src"
-        LUA_SSL_NGINX_MODULE="$PARENTF/opt/lua-ssl-nginx-module.git/"
+        LUAJIT2_BUILD_LIB="$PARENTF/lua_src/luajit2.git/build/lib"
+        LUAJIT2_SRC="$PARENTF/lua_src/luajit2.git/src"
+        LUA_SSL_NGINX_MODULE="$PARENTF/lua_src/lua-ssl-nginx-module.git/"
     else
         PREFIX="/usr/local/$NGINXV"
         CONF_PATH="/etc/$NGINXV/nginx.conf"
@@ -573,18 +552,18 @@ function make_configure {
         FASTCGI_TEMP_PATH="/var/lib/nginx/fastcgi/"
         UWSGI_TEMP_PATH="/var/lib/nginx/uwsgi/"
         SCGI_TEMP_PATH="/var/lib/nginx/scgi/"
-        LUAJIT2_BUILD_LIB="/opt/luajit2.git/build/lib"
-        LUAJIT2_SRC="/opt/luajit2.git/src"
-        LUA_SSL_NGINX_MODULE="/opt/lua-ssl-nginx-module.git/"
+        LUAJIT2_BUILD_LIB="/opt/lua_src/luajit2.git/build/lib"
+        LUAJIT2_SRC="/opt/lua_src/luajit2.git/src"
+        LUA_SSL_NGINX_MODULE="/opt/lua_src/lua-ssl-nginx-module.git/"
     fi
     
     WITH_OPENSSL=""
     if [ -d openssl-OpenSSL_1_1_1g ]; then
-        WITH_OPENSSL="--with-openssl=$PARENTF/openssl-OpenSSL_1_1_1g --with-openssl-opt='enable-tls1_3'"
+        WITH_OPENSSL="--with-openssl=$PARENTF/etc_src/openssl-OpenSSL_1_1_1g --with-openssl-opt='enable-tls1_3'"
     fi
     
     
-cat << L10HEREDOC > $NGINXV/nginx_configuration
+cat << L10HEREDOC > ngx_src/$NGINXV/nginx_configuration
 #!/bin/bash
 
 ./configure \\
@@ -624,31 +603,32 @@ cat << L10HEREDOC > $NGINXV/nginx_configuration
 --with-pcre \\
 --with-pcre-jit \\
 --with-libatomic \\
---add-module=../memc-nginx-module.git/ \\
---add-module=../lua-nginx-module.git/ \\
---add-module=../ngx_devel_kit.git/ \\
---add-module=../redis2-nginx-module.git/ \\
---add-module=../echo-nginx-module.git/ \\
---add-module=../form-input-nginx-module.git/ \\
---add-module=../set-misc-nginx-module.git/ \\
---add-module=../nginx-upload-module.git/ \\
---add-module=../ngx_cache_purge.git/ \\
---add-module=../headers-more-nginx-module.git/ \\
---add-module=../naxsi.git/naxsi_src/ \\
---add-module=../replace-filter-nginx-module.git/ \\
---add-module=../rds-json-nginx-module.git/ \\
---add-module=../rds-csv-nginx-module.git/ \\
---add-module=../drizzle-nginx-module.git/ \\
---add-module=../ngx_postgres.git/ \\
---add-module=../njs.git/nginx/ \\
---add-module=../stream-lua-nginx-module.git/ \\
---add-module=../xss-nginx-module.git/ \\
---add-module=../nginx-rtmp-module.git/ \\
+--add-module=../../ngx_module/memc-nginx-module.git/ \\
+--add-module=../../ngx_module/lua-nginx-module.git/ \\
+--add-module=../../ngx_module/ngx_devel_kit.git/ \\
+--add-module=../../ngx_module/redis2-nginx-module.git/ \\
+--add-module=../../ngx_module/echo-nginx-module.git/ \\
+--add-module=../../ngx_module/form-input-nginx-module.git/ \\
+--add-module=../../ngx_module/set-misc-nginx-module.git/ \\
+--add-module=../../ngx_module/nginx-upload-module.git/ \\
+--add-module=../../ngx_module/ngx_cache_purge.git/ \\
+--add-module=../../ngx_module/headers-more-nginx-module.git/ \\
+--add-module=../../ngx_module/naxsi.git/naxsi_src/ \\
+--add-module=../../ngx_module/replace-filter-nginx-module.git/ \\
+--add-module=../../ngx_module/rds-json-nginx-module.git/ \\
+--add-module=../../ngx_module/rds-csv-nginx-module.git/ \\
+--add-module=../../ngx_module/drizzle-nginx-module.git/ \\
+--add-module=../../ngx_module/ngx_postgres.git/ \\
+--add-module=../../ngx_module/njs.git/nginx/ \\
+--add-module=../../ngx_module/stream-lua-nginx-module.git/ \\
+--add-module=../../ngx_module/xss-nginx-module.git/ \\
+--add-module=../../ngx_module/nginx-rtmp-module.git/ \\
+--add-module=../../ngx_module/nginx-ts-module.git/ \\
 --add-module=$LUA_SSL_NGINX_MODULE \\
 
 L10HEREDOC
     
-    chmod +x "$NGINXV/nginx_configuration"
+    chmod +x "ngx_src/$NGINXV/nginx_configuration"
     
     notice "export these environment:"
     echo "unset LUAJIT_LIB && unset LUAJIT_INC"
@@ -658,16 +638,15 @@ L10HEREDOC
     echo "export LUAJIT_LIB=$LUAJIT2_BUILD_LIB && export LUAJIT_INC=$LUAJIT2_SRC"
     
     if [ $IS_LOCAL == 1 ]; then
-        echo "export SREGEX_LIB=../sregex.git/build/lib && export SREGEX_INC=../sregex.git/src"
-        echo "export LIBDRIZZLE_INC=../drizzle7-2011.07.21/build/include/libdrizzle-1.0 && export LIBDRIZZLE_LIB=../drizzle7-2011.07.21/build/lib64/"
+        echo "export SREGEX_LIB=$PARENTF/etc_src/sregex.git/build/lib && export SREGEX_INC=$PARENTF/etc_src/sregex.git/src"
+        echo "export LIBDRIZZLE_INC=$PARENTF/etc_src/drizzle7-2011.07.21/build/include/libdrizzle-1.0 && export LIBDRIZZLE_LIB=$PARENTF/etc_src/drizzle7-2011.07.21/build/lib64/"
     fi
-    notice
-    
+    echo
     
     notice 'run ./nginx_configuration'
-    notice 'make -j4 && make install'
+    notice 'make install -j4'
     
-    cd $NGINXV && exec bash
+    cd ngx_src/$NGINXV && exec bash
 }
 
 # ------------------------------------------------------------------------------
@@ -801,10 +780,58 @@ L12HEREDOC
 
 # ------------------------------------------------------------------------------
 
+# get_arch 'https://domain.tld/archive.tar.gz' 'archive.tar.gz' 'folder'
+
+function get_arch {
+    notice "get_arch [$1] FILE [$2] FOLD [$3]"
+    local     getUrl=$1
+    local   fileName=$2
+    local folderName=$3
+    
+    if [ ! -f $fileName ]; then
+        notice "wget $getUrl"
+        wget $getUrl
+    fi
+    
+    if [ -d $folderName ]; then
+        notice "rm rf $folderName"
+        rm -rf $folderName
+    fi
+    
+    
+    
+    if [ ! -d $folderName ] && [[ $fileName =~ ".zip" ]]; then
+        notice "unzip"
+        unzip $fileName
+    fi
+    
+    if [[ ! -d $folderName ]] && [[ $fileName =~ ".tar." ]]; then
+        notice "tar xf"
+        tar xf $fileName
+    fi
+    
+    
+    
+    if [ ! -f $fileName ]; then
+        err "get_arch: file $fileName is not exists"
+    fi
+    
+    if [ ! -d $folderName ]; then
+        err "get_arch: folder $folderName is not exists"
+    fi
+}
+
+# ------------------------------------------------------------------------------
+
+# get_github 'user' 'project.git'
+# get_github 'user' 'project.git' 'branch'
+# 
+# project 'project.git' save to similar folder 'project.git'
+
 function get_github {
-    notice "https://github.com/$1/$2"
+    notice "get_github https://github.com/$1/$2"
     local folderName=$2
-    local branch=$3
+    local     branch=$3
     
     if [ -d $folderName ]; then
         cd $folderName
@@ -820,7 +847,47 @@ function get_github {
         fi
     fi
     
+    if [ ! -d $folderName ]; then
+        err "get_github: folder $folderName is not exists"
+    fi
+    
     echo "https://github.com/$1/$folderName" >> "$PARENTF/versions"
+    
+    pushd $folderName
+        git describe --tags --abbrev=0
+        echo `git describe --tags --abbrev=0` >> "$PARENTF/versions"
+    popd
+}
+
+# ------------------------------------------------------------------------------
+
+# get_gitany 'https://domain.tld/anypath' 'folder.git'
+# get_gitany 'https://domain.tld/anypath' 'folder.git' 'branch'
+
+function get_gitany {
+    notice "get_gitany $1 to $2"
+    local folderName=$2
+    local     branch=$3
+    
+    if [ -d $folderName ]; then
+        pushd $folderName
+            pwd
+            git pull
+        popd
+    else
+        if [ "$branch" == "" ]; then
+            git clone $1 $folderName
+        else
+            warn "branch $branch"
+            git clone -b $branch $1 $folderName
+        fi
+    fi
+    
+    if [ ! -d $folderName ]; then
+        err "get_gitany: folder $folderName is not exists"
+    fi
+    
+    echo "$1" >> "$PARENTF/versions"
     
     pushd $folderName
         git describe --tags --abbrev=0
