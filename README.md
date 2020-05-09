@@ -28,6 +28,7 @@ drizzle7-2011.07.21.tar.gz
 
 * nginx-ts-module
 * wrk2
+* lua-nginx-module up to v0.10.16rc5
 
 ## sources
 
