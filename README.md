@@ -18,11 +18,6 @@ drizzle7-2011.07.21.tar.gz
 * github.com/openssl/openssl/archive/OpenSSL_1_1_1g.tar.gz
 1.1.1g
 
-## new
-
-* njs 0.4.0
-* lua-resty-mysql 0.22
-
 ## modules
 
 * github.com/openresty/memc-nginx-module.git
