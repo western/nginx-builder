@@ -10,6 +10,12 @@ based on https://gist.github.com/western/c04efe49745f24874c43
 * tar xf nginx-builder-x.x.tar.gz
 * ./install
 
+## command only
+
+* wget https://raw.githubusercontent.com/western/nginx-builder/dev/nginx_builder
+* chmod +x nginx_builder
+* ./nginx_builder
+
 ## fixed versions
 
 * nginx 1.18.0
@@ -18,12 +24,21 @@ drizzle7-2011.07.21.tar.gz
 * github.com/openssl/openssl/archive/OpenSSL_1_1_1g.tar.gz
 1.1.1g
 
-## modules
+## new
+
+* nginx-ts-module
+* wrk2
+
+## sources
+
+* github.com/openresty/sregex.git
+v0.0.1
+* github.com/giltene/wrk2.git
 
 * github.com/openresty/memc-nginx-module.git
 v0.19
 * github.com/openresty/lua-nginx-module.git
-v0.10.15
+v0.10.16rc5
 * github.com/simplresty/ngx_devel_kit.git
 v0.3.1
 * github.com/openresty/redis2-nginx-module.git
@@ -42,16 +57,14 @@ v0.32
 v0.33
 * github.com/nbs-system/naxsi.git
 0.56
-* github.com/openresty/sregex.git
-v0.0.1
 * github.com/openresty/replace-filter-nginx-module.git
 v0.01rc5
-* github.com/openresty/drizzle-nginx-module.git
-v0.1.11
 * github.com/openresty/rds-json-nginx-module.git
 v0.15
 * github.com/openresty/rds-csv-nginx-module.git
 v0.09
+* github.com/openresty/drizzle-nginx-module.git
+v0.1.11
 * github.com/openresty/ngx_postgres.git
 1.0
 * github.com/nginx/njs.git
@@ -62,6 +75,8 @@ v0.0.7
 v0.06
 * github.com/arut/nginx-rtmp-module.git
 v1.2.1
+* github.com/arut/nginx-ts-module.git
+v0.1.1
 * github.com/openresty/luajit2.git
 v2.1-20200102
 * github.com/openresty/lua-resty-core.git
