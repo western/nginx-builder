@@ -3,9 +3,11 @@
 # save and run
 # . nginx_builder
 
+CPUC=`cat /proc/cpuinfo | grep processor | wc -l`
+CPUC=$((CPUC-1))
 PARENTF=`pwd`
 NGINXV='nginx-1.18.0'
-IS_LOCAL=1
+IS_LOCAL=0
 IS_PAUSED=0
 IS_GET_ONLY=1
 
@@ -22,6 +24,7 @@ function main {
     
     #root_prepare
     #postgres_get
+    #redis_get
     
     etc_src
     ngx_module
@@ -166,8 +169,8 @@ function postgres_get {
     
     
     if [ $IS_LOCAL == 1 ]; then
-        PREFIX="$PARENTF/pgsql-12.2"
-        DATADIR="$PARENTF/pgsql-12.2/data"
+        PREFIX="$PARENTF/build/pgsql-12.2"
+        DATADIR="$PARENTF/build/pgsql-12.2/data"
         
         rm -rf $PREFIX
         
@@ -186,12 +189,7 @@ function postgres_get {
         chown postgres:postgres $DATADIR
     fi
     
-    if [ ! -f $POSTGRESV.tar.gz ]; then
-        wget "https://ftp.postgresql.org/pub/source/v12.2/$POSTGRESV.tar.gz"
-    fi
-    
-    tar xf $POSTGRESV.tar.gz
-    
+    get_arch "https://ftp.postgresql.org/pub/source/v12.2/$POSTGRESV.tar.gz" "$POSTGRESV.tar.gz" $POSTGRESV
     pushd $POSTGRESV
         ./configure --prefix=$PREFIX && make install -j4
     popd
@@ -232,6 +230,25 @@ function postgres_get {
     fi
     
     
+}
+
+# ------------------------------------------------------------------------------
+
+function redis_get {
+    
+    notice "redis_get"
+    
+    mkdir etc_src ; cd etc_src
+    
+    get_arch 'https://github.com/antirez/redis/archive/6.0.1.tar.gz' 'redis-6.0.1.tar.gz' 'redis-6.0.1'
+    pushd 'redis-6.0.1'
+        
+        #make BUILD_TLS=yes -j$CPUC
+        make BUILD_TLS=yes PREFIX=$PARENTF/build/redis-6.0.1 install -j$CPUC
+        
+    popd
+    
+    cd $PARENTF
 }
 
 # ------------------------------------------------------------------------------
@@ -789,8 +806,8 @@ function get_arch {
     local folderName=$3
     
     if [ ! -f $fileName ]; then
-        notice "wget $getUrl"
-        wget $getUrl
+        notice "wget $getUrl -O $fileName"
+        wget $getUrl -O $fileName
     fi
     
     if [ -d $folderName ]; then
