@@ -303,6 +303,7 @@ function etc_src {
     if [ $IS_GET_ONLY == 0 ]; then
         pushd 'modsecurity-v3.0.4'
             
+            rm .gitignore
             make clean
             
             if [ $IS_LOCAL == 1 ]; then
