@@ -50,7 +50,23 @@ function main {
                 ldconfig
             popd
         fi
-    
+        
+        if [ $IS_GET_ONLY == 0 ]; then
+            pushd 'modsecurity-v3.0.4'
+                
+                make clean
+                
+                if [ $IS_LOCAL == 1 ]; then
+                    ./configure --prefix=$BUILDF/modsecurity
+                else
+                    # /usr/local/modsecurity
+                    ./configure
+                fi
+                
+                make install -j$CPUC
+            popd
+        fi
+        
     popd
     
     
