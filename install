@@ -3,7 +3,10 @@
 # save and run
 # . install
 
+CPUC=`cat /proc/cpuinfo | grep processor | wc -l`
+CPUC=$((CPUC-1))
 PARENTF=`pwd`
+BUILDF="$PARENTF/build"
 NGINXV='nginx-1.18.0'
 IS_LOCAL=1
 IS_PAUSED=0
@@ -258,6 +261,7 @@ cat << L10HEREDOC > ngx_src/$NGINXV/nginx_configuration
 --add-module=../../ngx_module/ngx_cache_purge.git/ \\
 --add-module=../../ngx_module/headers-more-nginx-module.git/ \\
 --add-module=../../ngx_module/naxsi.git/naxsi_src/ \\
+--add-module=../../ngx_module/ModSecurity-nginx.git/ \\
 --add-module=../../ngx_module/replace-filter-nginx-module.git/ \\
 --add-module=../../ngx_module/rds-json-nginx-module.git/ \\
 --add-module=../../ngx_module/rds-csv-nginx-module.git/ \\
@@ -278,12 +282,15 @@ L10HEREDOC
     echo "unset LUAJIT_LIB && unset LUAJIT_INC"
     echo "unset SREGEX_LIB && unset SREGEX_INC"
     echo "unset LIBDRIZZLE_INC && unset LIBDRIZZLE_LIB"
+    echo "unset MODSECURITY_INC && unset MODSECURITY_LIB"
     echo
     echo "export LUAJIT_LIB=$LUAJIT2_BUILD_LIB && export LUAJIT_INC=$LUAJIT2_SRC"
     
     if [ $IS_LOCAL == 1 ]; then
         echo "export SREGEX_LIB=$PARENTF/etc_src/sregex.git/build/lib && export SREGEX_INC=$PARENTF/etc_src/sregex.git/src"
         echo "export LIBDRIZZLE_INC=$PARENTF/etc_src/drizzle7-2011.07.21/build/include/libdrizzle-1.0 && export LIBDRIZZLE_LIB=$PARENTF/etc_src/drizzle7-2011.07.21/build/lib64/"
+        echo "export MODSECURITY_INC=$BUILDF/modsecurity/include/"
+        echo "export MODSECURITY_LIB=$BUILDF/modsecurity/lib64/"
     fi
     echo
     
