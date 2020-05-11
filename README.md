@@ -58,6 +58,8 @@ v0.32
 v0.33
 * github.com/nbs-system/naxsi.git
 0.56
+* github.com/SpiderLabs/ModSecurity-nginx.git
+v1.0.1
 * github.com/openresty/replace-filter-nginx-module.git
 v0.01rc5
 * github.com/openresty/rds-json-nginx-module.git
