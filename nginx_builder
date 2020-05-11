@@ -6,8 +6,9 @@
 CPUC=`cat /proc/cpuinfo | grep processor | wc -l`
 CPUC=$((CPUC-1))
 PARENTF=`pwd`
+BUILDF="$PARENTF/build"
 NGINXV='nginx-1.18.0'
-IS_LOCAL=0
+IS_LOCAL=1
 IS_PAUSED=0
 IS_GET_ONLY=1
 
@@ -46,6 +47,8 @@ function main {
 function prepare_for_archive {
     
     notice "prepare_for_archive"
+    
+    cd $PARENTF
     
     find . -type d -name '.git' -not -path "./.git" | xargs rm -rf
     find . -type d -name '.git' -not -path "./.git"
@@ -169,8 +172,8 @@ function postgres_get {
     
     
     if [ $IS_LOCAL == 1 ]; then
-        PREFIX="$PARENTF/build/pgsql-12.2"
-        DATADIR="$PARENTF/build/pgsql-12.2/data"
+        PREFIX="$BUILDF/pgsql-12.2"
+        DATADIR="$BUILDF/pgsql-12.2/data"
         
         rm -rf $PREFIX
         
@@ -244,7 +247,7 @@ function redis_get {
     pushd 'redis-6.0.1'
         
         #make BUILD_TLS=yes -j$CPUC
-        make BUILD_TLS=yes PREFIX=$PARENTF/build/redis-6.0.1 install -j$CPUC
+        make BUILD_TLS=yes PREFIX=$BUILDF/redis-6.0.1 install -j$CPUC
         
     popd
     
@@ -295,6 +298,24 @@ function etc_src {
         popd
     fi
     
+    get_arch 'https://github.com/SpiderLabs/ModSecurity/releases/download/v3.0.4/modsecurity-v3.0.4.tar.gz' 'modsecurity-v3.0.4.tar.gz' 'modsecurity-v3.0.4'
+    
+    if [ $IS_GET_ONLY == 0 ]; then
+        pushd 'modsecurity-v3.0.4'
+            
+            make clean
+            
+            if [ $IS_LOCAL == 1 ]; then
+                ./configure --prefix=$BUILDF/modsecurity
+            else
+                # /usr/local/modsecurity
+                ./configure
+            fi
+            
+            make install -j$CPUC
+        popd
+    fi
+    
     get_github 'giltene' 'wrk2.git'
     
     cd $PARENTF
@@ -319,6 +340,7 @@ function ngx_module {
     get_github 'FRiCKLE'   'ngx_cache_purge.git'
     get_github 'openresty' 'headers-more-nginx-module.git'
     get_github 'nbs-system' 'naxsi.git'
+    get_github 'SpiderLabs' 'ModSecurity-nginx.git'
     
     get_github 'openresty' 'replace-filter-nginx-module.git'
     get_github 'openresty' 'rds-json-nginx-module.git'
@@ -544,8 +566,8 @@ function make_configure {
     local LUA_SSL_NGINX_MODULE=""
     
     if [ $IS_LOCAL == 1 ]; then
-        mkdir -p $PARENTF/build/{tmp,proxy,fastcgi,uwsgi,scgi}
-        PREFIX="$PARENTF/build/"
+        mkdir -p $BUILDF/{tmp,proxy,fastcgi,uwsgi,scgi}
+        PREFIX="$BUILDF/"
         CONF_PATH="$PREFIX/conf/nginx.conf"
         PID_PATH="$PREFIX/logs/nginx.pid"
         ERROR_LOG="$PREFIX/logs/error.log"
@@ -631,6 +653,7 @@ cat << L10HEREDOC > ngx_src/$NGINXV/nginx_configuration
 --add-module=../../ngx_module/ngx_cache_purge.git/ \\
 --add-module=../../ngx_module/headers-more-nginx-module.git/ \\
 --add-module=../../ngx_module/naxsi.git/naxsi_src/ \\
+--add-module=../../ngx_module/ModSecurity-nginx.git/ \\
 --add-module=../../ngx_module/replace-filter-nginx-module.git/ \\
 --add-module=../../ngx_module/rds-json-nginx-module.git/ \\
 --add-module=../../ngx_module/rds-csv-nginx-module.git/ \\
@@ -651,12 +674,15 @@ L10HEREDOC
     echo "unset LUAJIT_LIB && unset LUAJIT_INC"
     echo "unset SREGEX_LIB && unset SREGEX_INC"
     echo "unset LIBDRIZZLE_INC && unset LIBDRIZZLE_LIB"
+    echo "unset MODSECURITY_INC && unset MODSECURITY_LIB"
     echo
     echo "export LUAJIT_LIB=$LUAJIT2_BUILD_LIB && export LUAJIT_INC=$LUAJIT2_SRC"
     
     if [ $IS_LOCAL == 1 ]; then
         echo "export SREGEX_LIB=$PARENTF/etc_src/sregex.git/build/lib && export SREGEX_INC=$PARENTF/etc_src/sregex.git/src"
         echo "export LIBDRIZZLE_INC=$PARENTF/etc_src/drizzle7-2011.07.21/build/include/libdrizzle-1.0 && export LIBDRIZZLE_LIB=$PARENTF/etc_src/drizzle7-2011.07.21/build/lib64/"
+        echo "export MODSECURITY_INC=$BUILDF/modsecurity/include/"
+        echo "export MODSECURITY_LIB=$BUILDF/modsecurity/lib64/"
     fi
     echo
     
@@ -810,10 +836,10 @@ function get_arch {
         wget $getUrl -O $fileName
     fi
     
-    if [ -d $folderName ]; then
-        notice "rm rf $folderName"
-        rm -rf $folderName
-    fi
+    #if [ -d $folderName ]; then
+    #    notice "rm rf $folderName"
+    #    rm -rf $folderName
+    #fi
     
     
     
