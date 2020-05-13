@@ -244,12 +244,13 @@ function redis_get {
     mkdir etc_src ; cd etc_src
     
     get_arch 'https://github.com/antirez/redis/archive/6.0.1.tar.gz' 'redis-6.0.1.tar.gz' 'redis-6.0.1'
-    pushd 'redis-6.0.1'
-        
-        #make BUILD_TLS=yes -j$CPUC
-        make BUILD_TLS=yes PREFIX=$BUILDF/redis-6.0.1 install -j$CPUC
-        
-    popd
+    if [ $IS_GET_ONLY == 0 ]; then
+        pushd 'redis-6.0.1'
+            
+            make BUILD_TLS=yes PREFIX=$BUILDF/redis-6.0.1 install -j$CPUC
+            
+        popd
+    fi
     
     cd $PARENTF
 }
