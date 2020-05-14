@@ -14,6 +14,7 @@ based on https://gist.github.com/western/c04efe49745f24874c43
 
 * wget https://raw.githubusercontent.com/western/nginx-builder/dev/nginx_builder
 * chmod +x nginx_builder
+* make code fit
 ```bash
 IS_LOCAL=1|0 - const for locate folder to build
 IS_PAUSED=1|0 - program wait for info board
