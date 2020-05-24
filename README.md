@@ -77,7 +77,7 @@ v0.1.11
 * github.com/openresty/ngx_postgres.git
 1.0
 * github.com/nginx/njs.git
-0.4.0
+0.4.1
 * github.com/openresty/stream-lua-nginx-module.git
 v0.0.7
 * github.com/openresty/xss-nginx-module.git
