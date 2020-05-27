@@ -4509,6 +4509,23 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("var o = {1:true, 2:'', length:-2}; Array.prototype.reverse.call(o) === o"),
       njs_str("true") },
 
+    { njs_str("["
+              " ['a','b','c'],"
+              " ['a','b','c','d'],"
+              " [,'b','c','d'],"
+              " ['a','b','c',],"
+              " [,'b','c',],"
+              "]"
+              ".map(v=>Object.defineProperty(v, 1, {value:v[1], enumerable:false}))"
+              ".map(v=>v.reverse().join(''))"),
+      njs_str("cba,dcba,dcb,cba,cb") },
+
+    { njs_str("Array.prototype[1] = 1; var x = [0]; x.length = 2; x.reverse(); x"),
+      njs_str("1,0") },
+
+    { njs_str("Array.prototype[0] = 0; var x = [,1]; x.reverse(); x"),
+      njs_str("1,0") },
+
     { njs_str("var a = [1,2,3,4]; a.indexOf()"),
       njs_str("-1") },
 
@@ -5979,8 +5996,55 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("var a = ['1','2','3','4','5','6']; a.sort()"),
       njs_str("1,2,3,4,5,6") },
 
+    { njs_str("var a = ['a', 'ab', '', 'aa']; a.sort()"),
+      njs_str(",a,aa,ab") },
+
+    { njs_str("var a = ['a', 'ab', '', 'aa']; a.sort()"),
+      njs_str(",a,aa,ab") },
+
+    { njs_str("var a = [23,1,8,5]; Object.defineProperty(a, '0', {enumerable:false});"
+              "a.sort((x,y)=>x-y)"),
+      njs_str("1,5,8,23") },
+
+    { njs_str("var a = {0:23,1:1,2:8,3:5,length:4};"
+              "Array.prototype.sort.call(a, (x,y)=>x-y);"
+              "Array.prototype.join.call(a)"),
+      njs_str("1,5,8,23") },
+
+    { njs_str("var a = " NJS_LARGE_ARRAY "; "
+              "a[100] = 1; a[512] = -1; a[5] = undefined;"
+              "a.sort();"
+              "a[0] == -1 && a[1] == 1 && a[2] == undefined"),
+      njs_str("true") },
+
+    { njs_str("var a = " NJS_LARGE_ARRAY "; "
+              "a.fill(1, 256, 512); a.fill(undefined, 1000, 1010);"
+              "Object.defineProperty(a, '256', {value: a[256], enumerable:false});"
+              "a.sort();"
+              "a[0] == 1 && a[255] == 1 && Object.getOwnPropertyDescriptor(a, '256').value == undefined"),
+      njs_str("true") },
+
+    { njs_str("var a = [23,1,,undefined,8,,5]; Object.defineProperty(a, '0', {enumerable:false});"
+              "a.sort((x,y)=>x-y)"),
+      njs_str("1,5,8,23,,,") },
+
     { njs_str("var o = { toString: function() { return 5 } };"
-                 "var a = [6,o,4,3,2,1]; a.sort()"),
+              "var a = [6,o,4,3,2,1]; a.sort(undefined)"),
+      njs_str("1,2,3,4,5,6") },
+
+    { njs_str("var a = [undefined,1]; a.sort()"),
+      njs_str("1,") },
+
+    { njs_str("var a = [,1]; a.sort()"),
+      njs_str("1,") },
+
+    { njs_str("var a = [,1,undefined]; a.sort()"),
+      njs_str("1,,") },
+
+    { njs_str("var a = ['1','2','3','4','5','6']; a.sort()"),
+      njs_str("1,2,3,4,5,6") },
+
+    { njs_str("var a = [1,2,3,4,5,6]; a.sort()"),
       njs_str("1,2,3,4,5,6") },
 
     { njs_str("var a = {0:3,1:2,2:1}; Array.prototype.sort.call(a) === a"),
@@ -5990,28 +6054,52 @@ static njs_unit_test_t  njs_test[] =
       njs_str("true") },
 
     { njs_str("var a = [1,2,3,4,5,6];"
-                 "a.sort(function(x, y) { return x - y })"),
+              "a.sort(function(x, y) { return x - y })"),
       njs_str("1,2,3,4,5,6") },
 
-    { njs_str("var a = [6,5,4,3,2,1];"
-                 "a.sort(function(x, y) { return x - y })"),
-      njs_str("1,2,3,4,5,6") },
+    { njs_str("var a = Array(128).fill().map((v,i,a)=>a.length-i);"
+              "a.sort((a,b)=>a-b);"
+              "a.every((v,i,a)=> (i < 1 || v >= a[i-1]))"),
+      njs_str("true") },
 
     { njs_str("var a = [2,2,2,1,1,1];"
-                 "a.sort(function(x, y) { return x - y })"),
+              "a.sort(function(x, y) { return x - y })"),
       njs_str("1,1,1,2,2,2") },
 
     { njs_str("var a = [,,,2,2,2,1,1,1];"
-                 "a.sort(function(x, y) { return x - y })"),
+              "a.sort(function(x, y) { return x - y })"),
       njs_str("1,1,1,2,2,2,,,") },
 
     { njs_str("var a = [,,,,];"
-                 "a.sort(function(x, y) { return x - y })"),
+              "a.sort(function(x, y) { return x - y })"),
       njs_str(",,,") },
 
+    { njs_str("var a = [,,undefined,undefined,,undefined];"
+              "a.sort(function(x, y) { return x - y }); njs.dump(a)"),
+      njs_str("[undefined,undefined,undefined,<empty>,<empty>,<empty>]") },
+
+    { njs_str("var a = [1,,undefined,8,undefined,,undefined,,2];"
+              "a.sort(function(x, y) { return x - y }); njs.dump(a)"),
+      njs_str("[1,2,8,undefined,undefined,undefined,<empty>,<empty>,<empty>]") },
+
     { njs_str("var a = [1,,];"
-                 "a.sort(function(x, y) { return x - y })"),
+              "a.sort(function(x, y) { return x - y })"),
       njs_str("1,") },
+
+    { njs_str("var a = [{ n: 'A', r: 2 },"
+              "         { n: 'B', r: 3 },"
+              "         { n: 'C', r: 2 },"
+              "         { n: 'D', r: 3 },"
+              "         { n: 'E', r: 3 }];"
+              "a.sort((a, b) => b.r - a.r).map(v=>v.n).join('')"),
+      njs_str("BDEAC") },
+
+    { njs_str("var count = 0;"
+              "[4,3,2,1].sort(function(x, y) { if (count++ == 2) {throw Error('Oops'); }; return x - y })"),
+      njs_str("Error: Oops") },
+
+    { njs_str("[1,2].sort(1)"),
+      njs_str("TypeError: comparefn must be callable or undefined") },
 
     /* Template literal. */
 
@@ -15221,6 +15309,23 @@ static njs_unit_test_t  njs_test[] =
                  "args.join('|')"),
       njs_str("0:2|a:3|1:[object Object]|:2,[object Object]") },
 
+    { njs_str("JSON.parse('[0,1,2]', function(k, v) {"
+              "    if (v == 2) {"
+              "        return undefined;"
+              "    }"
+              "    return v;"
+              "});"),
+      njs_str("0,1,") },
+
+    { njs_str("JSON.parse('[0,1,2]', function(k, v) {"
+              "    if (v == 0) {"
+              "        Object.defineProperty(this, '0', {value: undefined, enumerable: false});"
+              "        return undefined;"
+              "    }"
+              "    return v;"
+              "});"),
+      njs_str(",1,2") },
+
     { njs_str("JSON.parse()"),
       njs_str("SyntaxError: Unexpected token at position 0") },
 
@@ -17917,6 +18022,134 @@ done:
 }
 
 
+typedef struct {
+    size_t      size;
+    uint32_t    array[32];
+    size_t      esize;
+    uint32_t    expected[32];
+} njs_sort_test_t;
+
+
+static int
+njs_sort_cmp(const void *a, const void *b, void *ctx)
+{
+    njs_sort_test_t  *c;
+
+    c = ctx;
+
+    switch (c->esize) {
+    case 1:
+        return *((uint8_t *) a) - *((uint8_t *) b);
+    case 2:
+        return *((uint16_t *) a) - *((uint16_t *) b);
+    case 4:
+    default:
+        return *((uint32_t *) a) - *((uint32_t *) b);
+    }
+}
+
+
+static njs_int_t
+njs_sort_test(njs_vm_t *vm, njs_opts_t *opts, njs_stat_t *stat)
+{
+    u_char           *p;
+    njs_uint_t        i, j, k;
+    njs_sort_test_t  *t;
+    u_char           array[sizeof(t->array)];
+    uint32_t         sorted[sizeof(t->array) / sizeof(t->array[0])];
+
+    static const njs_sort_test_t tests[] = {
+        { 1, { 5 }, 1, { 5 } },
+        { 3, { 3, 2, 1 }, 1, { 1, 2, 3 } },
+        { 4, { 4, 3, 2, 1 }, 1, { 1, 2, 3, 4 } },
+        { 5, { 5, 4, 3, 2, 1 }, 1, { 1, 2, 3, 4, 5 } },
+        { 5, { 1, 0, 9, 1, 8 }, 1, { 0, 1, 1, 8, 9 } },
+        { 8, { 0, 0, 0, 0, 0, 0, 0, 0 }, 1, { 0, 0, 0, 0, 0, 0, 0, 0 } },
+        { 8, { 4, 5, 1, 4, 2, 5, 5, 6 }, 1, { 1, 2, 4, 4, 5, 5, 5, 6 } },
+        { 4, { 512, 100, 65535, 0 }, 2, { 0, 100, 512, 65535 } },
+        { 3, { 65536, 3, 262141 }, 4, { 3, 65536, 262141 } },
+    };
+
+    for (i = 0; i < njs_nitems(tests); i++) {
+        t = (njs_sort_test_t *) &tests[i];
+
+        p = array;
+        for (k = 0; k < t->size; k++) {
+            switch (t->esize) {
+            case 1:
+                *p = (uint8_t) t->array[k];
+                break;
+            case 2:
+                *(uint16_t *) p = (uint16_t) t->array[k];
+                break;
+            case 4:
+            default:
+                *(uint32_t *) p = (uint32_t) t->array[k];
+                break;
+            }
+
+            p += t->esize;
+        }
+
+        njs_qsort(array, t->size, t->esize, njs_sort_cmp, t);
+
+        p = array;
+        for (k = 0; k < t->size; k++) {
+            switch (t->esize) {
+            case 1:
+                sorted[k] = *p;
+                break;
+            case 2:
+                sorted[k] = *(uint16_t *) p;
+                break;
+            case 4:
+            default:
+                sorted[k] = *(uint32_t *) p;
+                break;
+            }
+
+            p += t->esize;
+        }
+
+
+        for (k = 0; k < t->size; k++) {
+            if (sorted[k] != t->expected[k]) {
+                goto failed;
+            }
+        }
+
+        stat->passed++;
+        continue;
+
+failed:
+
+        njs_printf("njs_sort_test([");
+        for (j = 0; j < t->size; j++) {
+            njs_printf("%uD%s", t->array[j],
+                       (j < t->size - 1) ? "," : "");
+        }
+
+        njs_printf("]):\nexpected: [");
+        for (j = 0; j < t->size; j++) {
+            njs_printf("%uD%s", t->expected[j],
+                       (j < t->size - 1) ? "," : "");
+        }
+
+        njs_printf("]\n     got: [");
+        for (j = 0; j < t->size; j++) {
+            njs_printf("%uD%s", sorted[j],
+                       (j < t->size - 1) ? "," : "");
+        }
+
+        njs_printf("]\n");
+
+        stat->failed++;
+    }
+
+    return NJS_OK;
+}
+
+
 static njs_int_t
 njs_string_to_index_test(njs_vm_t *vm, njs_opts_t *opts, njs_stat_t *stat)
 {
@@ -18020,6 +18253,8 @@ njs_api_test(njs_opts_t *opts, njs_stat_t *stat)
           njs_str("njs_file_dirname_test") },
         { njs_chb_test,
           njs_str("njs_chb_test") },
+        { njs_sort_test,
+          njs_str("njs_sort_test") },
         { njs_string_to_index_test,
           njs_str("njs_string_to_index_test") },
     };

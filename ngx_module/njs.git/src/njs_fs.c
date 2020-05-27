@@ -440,11 +440,22 @@ done:
 
 
 static njs_int_t
-njs_fs_rename_sync(njs_vm_t *vm, njs_value_t *args, njs_uint_t nargs,
-    njs_index_t unused)
+njs_fs_rename(njs_vm_t *vm, njs_value_t *args, njs_uint_t nargs,
+    njs_index_t calltype)
 {
-    njs_int_t   ret;
-    const char  *old_path, *new_path;
+    njs_int_t    ret;
+    const char   *old_path, *new_path;
+    njs_value_t  retval, *callback;
+
+    callback = NULL;
+
+    if (calltype == NJS_FS_CALLBACK) {
+        callback = njs_arg(args, nargs, 3);
+        if (!njs_is_function(callback)) {
+            njs_type_error(vm, "\"callback\" must be a function");
+            return NJS_ERROR;
+        }
+    }
 
     ret = njs_fs_path_arg(vm, &old_path, njs_arg(args, nargs, 1),
                           &njs_str_value("oldPath"));
@@ -458,16 +469,18 @@ njs_fs_rename_sync(njs_vm_t *vm, njs_value_t *args, njs_uint_t nargs,
         return ret;
     }
 
+    njs_set_undefined(&retval);
+
     ret = rename(old_path, new_path);
     if (njs_slow_path(ret != 0)) {
-        (void) njs_fs_error(vm, "rename", strerror(errno), NULL, errno,
-                            &vm->retval);
-        return NJS_ERROR;
+        ret = njs_fs_error(vm, "rename", strerror(errno), NULL, errno, &retval);
     }
 
-    njs_set_undefined(&vm->retval);
+    if (ret == NJS_OK) {
+        return njs_fs_result(vm, &retval, calltype, callback, 1);
+    }
 
-    return NJS_OK;
+    return NJS_ERROR;
 }
 
 
@@ -515,15 +528,12 @@ njs_fs_access(njs_vm_t *vm, njs_value_t *args, njs_uint_t nargs,
         return NJS_ERROR;
     }
 
+    njs_set_undefined(&retval);
+
     ret = access(file_path, md);
     if (njs_slow_path(ret != 0)) {
         ret = njs_fs_error(vm, "access", strerror(errno), path, errno, &retval);
-        goto done;
     }
-
-    njs_set_undefined(&retval);
-
-done:
 
     if (ret == NJS_OK) {
         return njs_fs_result(vm, &retval, calltype, callback, 1);
@@ -573,16 +583,13 @@ njs_fs_symlink(njs_vm_t *vm, njs_value_t *args, njs_uint_t nargs,
         return NJS_ERROR;
     }
 
+    njs_set_undefined(&retval);
+
     ret = symlink(target_path, file_path);
     if (njs_slow_path(ret != 0)) {
         ret = njs_fs_error(vm, "symlink", strerror(errno), path, errno,
                            &retval);
-        goto done;
     }
-
-    njs_set_undefined(&retval);
-
-done:
 
     if (ret == NJS_OK) {
         return njs_fs_result(vm, &retval, calltype, callback, 1);
@@ -616,15 +623,12 @@ njs_fs_unlink(njs_vm_t *vm, njs_value_t *args, njs_uint_t nargs,
         }
     }
 
+    njs_set_undefined(&retval);
+
     ret = unlink(file_path);
     if (njs_slow_path(ret != 0)) {
         ret = njs_fs_error(vm, "unlink", strerror(errno), path, errno, &retval);
-        goto done;
     }
-
-    njs_set_undefined(&retval);
-
-done:
 
     if (ret == NJS_OK) {
         return njs_fs_result(vm, &retval, calltype, callback, 1);
@@ -722,6 +726,168 @@ done:
 
     if (ret == NJS_OK) {
         return njs_fs_result(vm, &retval, calltype, callback, 2);
+    }
+
+    return NJS_ERROR;
+}
+
+
+static njs_int_t
+njs_fs_mkdir(njs_vm_t *vm, njs_value_t *args, njs_uint_t nargs,
+    njs_index_t calltype)
+{
+    mode_t       md;
+    njs_int_t    ret;
+    const char   *file_path;
+    njs_value_t  mode, recursive, retval, *path, *callback, *options;
+
+    static const njs_value_t  string_mode = njs_string("mode");
+    static const njs_value_t  string_recursive = njs_string("recursive");
+
+    path = njs_arg(args, nargs, 1);
+    ret = njs_fs_path_arg(vm, &file_path, path, &njs_str_value("path"));
+    if (njs_slow_path(ret != NJS_OK)) {
+        return ret;
+    }
+
+    callback = NULL;
+    options = njs_arg(args, nargs, 2);
+
+    if (njs_slow_path(calltype == NJS_FS_CALLBACK)) {
+        callback = njs_arg(args, nargs, njs_min(nargs - 1, 3));
+        if (!njs_is_function(callback)) {
+            njs_type_error(vm, "\"callback\" must be a function");
+            return NJS_ERROR;
+        }
+        if (options == callback) {
+            options = njs_value_arg(&njs_value_undefined);
+        }
+    }
+
+    njs_set_undefined(&mode);
+    njs_set_false(&recursive);
+
+    switch (options->type) {
+    case NJS_NUMBER:
+        mode = *options;
+        break;
+
+    case NJS_UNDEFINED:
+        break;
+
+    default:
+        if (!njs_is_object(options)) {
+            njs_type_error(vm, "Unknown options type: \"%s\" "
+                           "(a number or object required)",
+                           njs_type_string(options->type));
+            return NJS_ERROR;
+        }
+
+        ret = njs_value_property(vm, options, njs_value_arg(&string_mode),
+                                 &mode);
+        if (njs_slow_path(ret == NJS_ERROR)) {
+            return ret;
+        }
+
+        ret = njs_value_property(vm, options, njs_value_arg(&string_recursive),
+                                 &recursive);
+        if (njs_slow_path(ret == NJS_ERROR)) {
+            return ret;
+        }
+    }
+
+    md = njs_fs_mode(vm, &mode, 0777);
+    if (njs_slow_path(md == (mode_t) -1)) {
+        return NJS_ERROR;
+    }
+
+    if (njs_is_true(&recursive)) {
+        njs_type_error(vm, "\"options.recursive\" is not supported");
+        return NJS_ERROR;
+    }
+
+    njs_set_undefined(&retval);
+
+    ret = mkdir(file_path, md);
+    if (njs_slow_path(ret != 0)) {
+        ret = njs_fs_error(vm, "mkdir", strerror(errno), path, errno,
+                           &retval);
+    }
+
+    if (ret == NJS_OK) {
+        return njs_fs_result(vm, &retval, calltype, callback, 1);
+    }
+
+    return NJS_ERROR;
+}
+
+
+static njs_int_t
+njs_fs_rmdir(njs_vm_t *vm, njs_value_t *args, njs_uint_t nargs,
+    njs_index_t calltype)
+{
+    njs_int_t    ret;
+    const char   *file_path;
+    njs_value_t  recursive, retval, *path, *callback, *options;
+
+    static const njs_value_t  string_recursive = njs_string("recursive");
+
+    path = njs_arg(args, nargs, 1);
+    ret = njs_fs_path_arg(vm, &file_path, path, &njs_str_value("path"));
+    if (njs_slow_path(ret != NJS_OK)) {
+        return ret;
+    }
+
+    callback = NULL;
+    options = njs_arg(args, nargs, 2);
+
+    if (njs_slow_path(calltype == NJS_FS_CALLBACK)) {
+        callback = njs_arg(args, nargs, njs_min(nargs - 1, 3));
+        if (!njs_is_function(callback)) {
+            njs_type_error(vm, "\"callback\" must be a function");
+            return NJS_ERROR;
+        }
+        if (options == callback) {
+            options = njs_value_arg(&njs_value_undefined);
+        }
+    }
+
+    njs_set_false(&recursive);
+
+    switch (options->type) {
+    case NJS_UNDEFINED:
+        break;
+
+    default:
+        if (!njs_is_object(options)) {
+            njs_type_error(vm, "Unknown options type: \"%s\" "
+                           "(an object required)",
+                           njs_type_string(options->type));
+            return NJS_ERROR;
+        }
+
+        ret = njs_value_property(vm, options, njs_value_arg(&string_recursive),
+                                 &recursive);
+        if (njs_slow_path(ret == NJS_ERROR)) {
+            return ret;
+        }
+    }
+
+    if (njs_is_true(&recursive)) {
+        njs_type_error(vm, "\"options.recursive\" is not supported");
+        return NJS_ERROR;
+    }
+
+    njs_set_undefined(&retval);
+
+    ret = rmdir(file_path);
+    if (njs_slow_path(ret != 0)) {
+        ret = njs_fs_error(vm, "rmdir", strerror(errno), path, errno,
+                           &retval);
+    }
+
+    if (ret == NJS_OK) {
+        return njs_fs_result(vm, &retval, calltype, callback, 1);
     }
 
     return NJS_ERROR;
@@ -873,9 +1039,11 @@ njs_fs_error(njs_vm_t *vm, const char *syscall, const char *description,
     size_t        size;
     njs_int_t     ret;
     njs_value_t   value;
+    const char    *code;
     njs_object_t  *error;
 
     static const njs_value_t  string_errno = njs_string("errno");
+    static const njs_value_t  string_code = njs_string("code");
     static const njs_value_t  string_path = njs_string("path");
     static const njs_value_t  string_syscall = njs_string("syscall");
 
@@ -896,6 +1064,20 @@ njs_fs_error(njs_vm_t *vm, const char *syscall, const char *description,
     if (errn != 0) {
         njs_set_number(&value, errn);
         ret = njs_value_property_set(vm, retval, njs_value_arg(&string_errno),
+                                     &value);
+        if (njs_slow_path(ret != NJS_OK)) {
+            return NJS_ERROR;
+        }
+
+        code = njs_errno_string(errn);
+        size = njs_strlen(code);
+
+        ret = njs_string_new(vm, &value, (u_char *) code, size, size);
+        if (njs_slow_path(ret != NJS_OK)) {
+            return NJS_ERROR;
+        }
+
+        ret = njs_value_property_set(vm, retval, njs_value_arg(&string_code),
                                      &value);
         if (njs_slow_path(ret != NJS_OK)) {
             return NJS_ERROR;
@@ -1087,6 +1269,30 @@ static const njs_object_prop_t  njs_fs_promises_properties[] =
 
     {
         .type = NJS_PROPERTY,
+        .name = njs_string("mkdir"),
+        .value = njs_native_function2(njs_fs_mkdir, 0, NJS_FS_PROMISE),
+        .writable = 1,
+        .configurable = 1,
+    },
+
+    {
+        .type = NJS_PROPERTY,
+        .name = njs_string("rename"),
+        .value = njs_native_function2(njs_fs_rename, 0, NJS_FS_PROMISE),
+        .writable = 1,
+        .configurable = 1,
+    },
+
+    {
+        .type = NJS_PROPERTY,
+        .name = njs_string("rmdir"),
+        .value = njs_native_function2(njs_fs_rmdir, 0, NJS_FS_PROMISE),
+        .writable = 1,
+        .configurable = 1,
+    },
+
+    {
+        .type = NJS_PROPERTY,
         .name = njs_string("symlink"),
         .value = njs_native_function2(njs_fs_symlink, 0, NJS_FS_PROMISE),
         .writable = 1,
@@ -1261,8 +1467,16 @@ static const njs_object_prop_t  njs_fs_object_properties[] =
 
     {
         .type = NJS_PROPERTY,
+        .name = njs_string("rename"),
+        .value = njs_native_function2(njs_fs_rename, 0, NJS_FS_CALLBACK),
+        .writable = 1,
+        .configurable = 1,
+    },
+
+    {
+        .type = NJS_PROPERTY,
         .name = njs_string("renameSync"),
-        .value = njs_native_function(njs_fs_rename_sync, 0),
+        .value = njs_native_function2(njs_fs_rename, 0, NJS_FS_DIRECT),
         .writable = 1,
         .configurable = 1,
     },
@@ -1311,6 +1525,38 @@ static const njs_object_prop_t  njs_fs_object_properties[] =
         .type = NJS_PROPERTY,
         .name = njs_string("realpathSync"),
         .value = njs_native_function2(njs_fs_realpath, 0, NJS_FS_DIRECT),
+        .writable = 1,
+        .configurable = 1,
+    },
+
+    {
+        .type = NJS_PROPERTY,
+        .name = njs_string("mkdir"),
+        .value = njs_native_function2(njs_fs_mkdir, 0, NJS_FS_CALLBACK),
+        .writable = 1,
+        .configurable = 1,
+    },
+
+    {
+        .type = NJS_PROPERTY,
+        .name = njs_string("mkdirSync"),
+        .value = njs_native_function2(njs_fs_mkdir, 0, NJS_FS_DIRECT),
+        .writable = 1,
+        .configurable = 1,
+    },
+
+    {
+        .type = NJS_PROPERTY,
+        .name = njs_string("rmdir"),
+        .value = njs_native_function2(njs_fs_rmdir, 0, NJS_FS_CALLBACK),
+        .writable = 1,
+        .configurable = 1,
+    },
+
+    {
+        .type = NJS_PROPERTY,
+        .name = njs_string("rmdirSync"),
+        .value = njs_native_function2(njs_fs_rmdir, 0, NJS_FS_DIRECT),
         .writable = 1,
         .configurable = 1,
     },
