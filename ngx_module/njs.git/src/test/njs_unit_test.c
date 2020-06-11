@@ -275,7 +275,7 @@ static njs_unit_test_t  njs_test[] =
       njs_str("SyntaxError: Unexpected token \"0x\" in 1") },
 
     { njs_str("0xffff."),
-      njs_str("SyntaxError: Unexpected token \"\" in 1") },
+      njs_str("SyntaxError: Unexpected end of input in 1") },
 
     { njs_str("0x12g"),
       njs_str("SyntaxError: Unexpected token \"g\" in 1") },
@@ -1344,12 +1344,10 @@ static njs_unit_test_t  njs_test[] =
       njs_str("false") },
 
     { njs_str("1 && 1 ?? true"),
-      njs_str("SyntaxError: Either \"??\" or \"&&\" expression "
-              "must be parenthesized in 1") },
+      njs_str("SyntaxError: Unexpected token \"??\" in 1") },
 
     { njs_str("null ?? 0 || 1"),
-      njs_str("SyntaxError: Either \"??\" or \"||\" expression "
-              "must be parenthesized in 1") },
+      njs_str("SyntaxError: Unexpected token \"||\" in 1") },
 
     { njs_str("var a = true; a = -~!a"),
       njs_str("1") },
@@ -2936,6 +2934,9 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("a:{continue b}"),
       njs_str("SyntaxError: Undefined label \"b\" in 1") },
 
+    { njs_str("a:function name() {}"),
+      njs_str("SyntaxError: In strict mode code, functions can only be declared at top level or inside a block.") },
+
 #if 0 /* TODO */
     { njs_str("a:{1; break a}"),
       njs_str("1") },
@@ -4164,6 +4165,9 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("[0, 1, , , 1].copyWithin(0, 1, 4)"),
       njs_str("1,,,,1") },
 
+    { njs_str("[0, 1, 2, 3].copyWithin(0, 1, -10)"),
+      njs_str("0,1,2,3") },
+
     { njs_str("var o = [0, 1, , , 1].copyWithin(0, 1, 4); typeof o"),
       njs_str("object") },
 
@@ -4182,6 +4186,10 @@ static njs_unit_test_t  njs_test[] =
               "[].copyWithin.call(obj, 0, -2, -1);"
               "Object.keys(obj) + '|' + Object.values(obj)"),
       njs_str("length,1,2,3,4,5,0|5,a,b,c,d,e,c") },
+
+    { njs_str("var o = {length:1}; Object.defineProperty(o, '0', {get:()=>{throw Error('Oops')}});"
+              "Array.prototype.copyWithin.call(o, 0, 0)"),
+      njs_str("Error: Oops") },
 
     { njs_str("Array.prototype.slice(1)"),
       njs_str("") },
@@ -4491,6 +4499,102 @@ static njs_unit_test_t  njs_test[] =
                  "a.splice(3, 2, 8, 9, 10, 11 ).join(':') + '|' + a"),
       njs_str("3:4|0,1,2,8,9,10,11,5,6,7") },
 
+    { njs_str("["
+              " [],"
+              " [1],"
+              " [1, 2],"
+              " [1, 2, 'a'],"
+              " [1, 2, 'a', 'b'],"
+              " [1, 2, 'a', 'b', 'c'],"
+              "]"
+              ".map(args=>{var a = [0,1,3,4,5]; a.splice.apply(a, args); return a})"
+              ".map(v=>v.join(''))"),
+      njs_str("01345,0,045,0a45,0ab45,0abc45") },
+
+    { njs_str("["
+              " [],"
+              " [1],"
+              " [1, 1, 'a'],"
+              " [1, 2, 'a'],"
+              " [1, 2, 'a', 'b'],"
+              " [1, 2, 'a', 'b', 'c'],"
+              "]"
+              ".map(args=>{var a = [0,1,3,4,5]; return a.splice.apply(a, args);})"
+              ".map(v=>v.join(''))"),
+      njs_str(",1345,1,13,13,13") },
+
+    { njs_str("Object.prototype.splice = Array.prototype.splice;"
+              "Object.prototype.join = Array.prototype.join;"
+              "["
+              " [],"
+              " [1],"
+              " [1, 2],"
+              " [1, 1, 'a'],"
+              " [1, 2, 'a'],"
+              " [1, 2, 'a', 'b'],"
+              " [1, 2, 'a', 'b', 'c'],"
+              "]"
+              ".map(args=>{var a = {0:0, 1:1, 2:3, 3:4, 4:5, length:5};"
+              "            a.splice.apply(a, args); return a})"
+              ".map(v=>v.join(''))"),
+      njs_str("01345,0,045,0a345,0a45,0ab45,0abc45") },
+
+    { njs_str("Object.prototype.splice = Array.prototype.splice;"
+              "Object.prototype.join = Array.prototype.join;"
+              "["
+              " [],"
+              " [1],"
+              " [1, 0, 'a'],"
+              " [1, 1, 'a'],"
+              " [1, 2, 'a'],"
+              " [1, 2, 'a', 'b'],"
+              " [1, 2, 'a', 'b', 'c'],"
+              "]"
+              ".map(args=>{var a = {0:0, 1:1, 2:3, 3:4, 4:5, length:5};"
+              "            return a.splice.apply(a, args);})"
+              ".map(v=>v.join(''))"),
+      njs_str(",1345,,1,13,13,13") },
+
+    { njs_str("Array.prototype.splice.call({0:0,1:1,2:2,3:3,length:4},0,3,4,5)"),
+      njs_str("0,1,2") },
+
+    { njs_str("var obj = {0:0,1:1,2:2,3:3,length:4};"
+              "Array.prototype.splice.call(obj,0,3,4,5); obj[3]"),
+      njs_str("undefined") },
+
+    { njs_str("var obj = {4294967294: 'x', length:-1};"
+              "Array.prototype.splice.call(obj, 4294967294, 1); obj.length"),
+      njs_str("0") },
+
+    { njs_str("var obj = {0:0, 1:1, 2:2};"
+              "Object.defineProperty(obj, 'length', {value:3, writable:false});"
+              "Array.prototype.splice.call(obj, 1, 2, 4)"),
+      njs_str("TypeError: Cannot assign to read-only property \"length\" of object") },
+
+    { njs_str("var obj = {'9007199254740988': 'A', '9007199254740989': 'B',"
+              "           '9007199254740990': 'C', '9007199254740991': 'D', "
+              "           length: 2 ** 53 + 2};"
+              "Array.prototype.splice.call(obj, 2**53-3, 2 ** 53 + 4)"),
+      njs_str("B,C") },
+
+    { njs_str("var obj = {'9007199254740988': 'A', '9007199254740989': 'B',"
+              "           '9007199254740990': 'C', '9007199254740991': 'D', "
+              "           length: 2 ** 53 + 2};"
+              "Array.prototype.splice.call(obj, 2**53-3, 2 ** 53 + 4);"
+              "obj['9007199254740988'] == 'A' && obj['9007199254740991'] == 'D'"),
+      njs_str("true") },
+
+    { njs_str("var obj = {'9007199254740990': 'A', '9007199254740991': 'B',"
+              "           length: 2 ** 53 - 1};"
+              "Array.prototype.splice.call(obj, 2**53-2, 1, 'C');"
+              "obj['9007199254740990'] == 'C' && obj['9007199254740991'] == 'B'"),
+      njs_str("true") },
+
+    { njs_str("var obj = {'9007199254740990': 'A', '9007199254740991': 'B',"
+              "           length: 2 ** 53 - 1};"
+              "Array.prototype.splice.call(obj, 2**53-2, 0, 'C');"),
+      njs_str("TypeError: Invalid length") },
+
     { njs_str("var a = []; a.reverse()"),
       njs_str("") },
 
@@ -4505,6 +4609,15 @@ static njs_unit_test_t  njs_test[] =
 
     { njs_str("var a = [1,2,3,4]; a.reverse()"),
       njs_str("4,3,2,1") },
+
+    { njs_str("[1,2,3,,,].reverse()"),
+      njs_str(",,3,2,1") },
+
+    { njs_str("[,2,3,,,].reverse()"),
+      njs_str(",,3,2,") },
+
+    { njs_str("[,,,3,2,1].reverse()"),
+      njs_str("1,2,3,,,") },
 
     { njs_str("var o = {1:true, 2:'', length:-2}; Array.prototype.reverse.call(o) === o"),
       njs_str("true") },
@@ -5606,6 +5719,44 @@ static njs_unit_test_t  njs_test[] =
               "           return a.toString() === '1,2,3,3'})"),
       njs_str("true") },
 
+    { njs_str(NJS_TYPED_ARRAY_LIST
+              ".every(v=>{var orig = new v([255,255,1,2,3,4,5]);"
+              "           var a = new v(orig.buffer, 2* v.BYTES_PER_ELEMENT);"
+              "           a.copyWithin(0,3);"
+              "           return a.toString() === '4,5,3,4,5'})"),
+      njs_str("true") },
+
+    { njs_str(NJS_TYPED_ARRAY_LIST
+              ".every(v=>{var a = new v([]); a.sort(); "
+              "           return a.toString() === ''})"),
+      njs_str("true") },
+
+    { njs_str(NJS_TYPED_ARRAY_LIST
+              ".every(v=>{var a = new v([5]); a.sort(); "
+              "           return a.toString() === '5'})"),
+      njs_str("true") },
+
+    { njs_str(NJS_TYPED_ARRAY_LIST
+              ".every(v=>{var a = new v([3,3,2,1]); a.sort(); "
+              "           return a.toString() === '1,2,3,3'})"),
+      njs_str("true") },
+
+    { njs_str(NJS_TYPED_ARRAY_LIST
+              ".every(v=>{var a = new v([3,3,2,1]); a.sort((x,y)=>x-y); "
+              "           return a.toString() === '1,2,3,3'})"),
+      njs_str("true") },
+
+    { njs_str(NJS_TYPED_ARRAY_LIST
+              ".every(v=>{var a = (new v([255,255,3,3,2,1])).slice(2); a.sort(); "
+              "           return a.toString() === '1,2,3,3'})"),
+      njs_str("true") },
+
+    { njs_str("(new Float32Array([255,255,NaN,3,NaN,Infinity,3,-Infinity,0,-0,2,1,-5])).slice(2).sort()"),
+      njs_str("-Infinity,-5,0,0,1,2,3,3,Infinity,NaN,NaN") },
+
+    { njs_str("(new Float64Array([255,255,NaN,3,NaN,Infinity,3,-Infinity,0,-0,2,1,-5])).slice(2).sort()"),
+      njs_str("-Infinity,-5,0,0,1,2,3,3,Infinity,NaN,NaN") },
+
 #if NJS_HAVE_LARGE_STACK
     { njs_str("var o = Object({length: 3});"
                  "Object.defineProperty(o, '0', {set: function(v){this[0] = 2 * v}});"
@@ -6093,6 +6244,15 @@ static njs_unit_test_t  njs_test[] =
               "         { n: 'E', r: 3 }];"
               "a.sort((a, b) => b.r - a.r).map(v=>v.n).join('')"),
       njs_str("BDEAC") },
+
+    { njs_str("[1,2,3].sort(()=>-1)"),
+      njs_str("3,2,1") },
+
+    { njs_str("njs.dump([undefined,1,2,3].sort(()=>0))"),
+      njs_str("[1,2,3,undefined]") },
+
+    { njs_str("njs.dump([1,,2,3].sort(()=>0))"),
+      njs_str("[1,2,3,<empty>]") },
 
     { njs_str("var count = 0;"
               "[4,3,2,1].sort(function(x, y) { if (count++ == 2) {throw Error('Oops'); }; return x - y })"),
@@ -9125,7 +9285,7 @@ static njs_unit_test_t  njs_test[] =
       njs_str("3,4,5") },
 
     { njs_str("function myFoo(a,b,...other, c) { return other };"),
-      njs_str("SyntaxError: Unexpected token \"c\" in 1") },
+      njs_str("SyntaxError: Rest parameter must be last formal parameter in 1") },
 
     { njs_str("function sum(a, b, c, ...other) { return a+b+c+other[2] };"
                  "sum(\"one \",2,\" three \",\"four \",\"five \",\"the long enough sixth argument \");"),
@@ -11532,34 +11692,34 @@ static njs_unit_test_t  njs_test[] =
 
 #if NJS_HAVE_LARGE_STACK
     { njs_str("new Function(\"(\".repeat(2**13));"),
-      njs_str("RangeError: Maximum call stack size exceeded") },
+      njs_str("SyntaxError: Unexpected token \"}\" in runtime:1") },
 
     { njs_str("new Function(\"{\".repeat(2**13));"),
-      njs_str("RangeError: Maximum call stack size exceeded") },
+      njs_str("SyntaxError: Unexpected token \")\" in runtime:1") },
 
     { njs_str("new Function(\"[\".repeat(2**13));"),
-      njs_str("RangeError: Maximum call stack size exceeded") },
+      njs_str("SyntaxError: Unexpected token \"}\" in runtime:1") },
 
     { njs_str("new Function(\"`\".repeat(2**13));"),
       njs_str("RangeError: Maximum call stack size exceeded") },
 
     { njs_str("new Function(\"{[\".repeat(2**13));"),
-      njs_str("RangeError: Maximum call stack size exceeded") },
+      njs_str("SyntaxError: Unexpected token \")\" in runtime:1") },
 
     { njs_str("new Function(\"{;\".repeat(2**13));"),
-      njs_str("RangeError: Maximum call stack size exceeded") },
+      njs_str("SyntaxError: Unexpected token \")\" in runtime:1") },
 
     { njs_str("new Function(\"1;\".repeat(2**13));"),
       njs_str("RangeError: Maximum call stack size exceeded") },
 
     { njs_str("new Function(\"~\".repeat(2**13));"),
-      njs_str("RangeError: Maximum call stack size exceeded") },
+      njs_str("SyntaxError: Unexpected token \"}\" in runtime:1") },
 
     { njs_str("new Function(\"new \".repeat(2**13));"),
-      njs_str("RangeError: Maximum call stack size exceeded") },
+      njs_str("SyntaxError: Unexpected token \"}\" in runtime:1") },
 
     { njs_str("new Function(\"typeof \".repeat(2**13));"),
-      njs_str("RangeError: Maximum call stack size exceeded") },
+      njs_str("SyntaxError: Unexpected token \"}\" in runtime:1") },
 
     { njs_str("new Function(\"1\" + \"** 1\".repeat(2**13));"),
       njs_str("RangeError: Maximum call stack size exceeded") },
@@ -16211,12 +16371,20 @@ static njs_unit_test_t  njs_test[] =
                 "'writeFileSync',"
                 "'appendFile',"
                 "'appendFileSync',"
+                "'rename',"
+                "'renameSync',"
                 "'symlink',"
                 "'symlinkSync',"
                 "'unlink',"
                 "'unlinkSync',"
                 "'realpath',"
                 "'realpathSync',"
+                "'mkdir',"
+                "'mkdirSync',"
+                "'rmdir',"
+                "'rmdirSync',"
+                "'readdir',"
+                "'readdirSync',"
               "],"
               "test = (fname) =>"
                 "[undefined, null, false, NaN, Symbol(), {}, Object('/njs_unknown_path')]"
@@ -16239,9 +16407,13 @@ static njs_unit_test_t  njs_test[] =
                 "'readFile',"
                 "'writeFile',"
                 "'appendFile',"
+                "'rename',"
                 "'symlink',"
                 "'unlink',"
                 "'realpath',"
+                "'mkdir',"
+                "'rmdir',"
+                "'readdir',"
               "];"
               "func.every((x) => typeof fs[x] == 'function')"),
       njs_str("true")},
@@ -16261,6 +16433,35 @@ static njs_unit_test_t  njs_test[] =
                 "'X_OK',"
               "];"
               "items.every((x) => typeof fsc[x] == 'number')"),
+      njs_str("true")},
+
+    /* require('fs').Dirent */
+
+    { njs_str("var fs = require('fs');"
+              "typeof fs.Dirent"),
+      njs_str("function") },
+
+    { njs_str("var fs = require('fs');"
+              "fs.Dirent('file', 123)"),
+      njs_str("TypeError: the Dirent constructor must be called with new") },
+
+    { njs_str("var fs = require('fs');"
+              "var e = new fs.Dirent('file', 123); [e.name, e.type]"),
+      njs_str("file,123") },
+
+    { njs_str("var "
+              "fs = require('fs'),"
+              "e = new fs.Dirent('file', 0),"
+              "func = ["
+                "'isDirectory',"
+                "'isFile',"
+                "'isBlockDevice',"
+                "'isCharacterDevice',"
+                "'isSymbolicLink',"
+                "'isFIFO',"
+                "'isSocket',"
+              "];"
+              "func.every((x) => typeof e[x] == 'function')"),
       njs_str("true")},
 
     /* require('crypto').createHash() */
@@ -16621,6 +16822,194 @@ static njs_unit_test_t  njs_test[] =
                  "return 1}, enumerable:1}); a.b =1;"
                  "var x = Object.assign({}, a);x.b;"),
       njs_str("undefined") },
+
+    /* let and const */
+
+    { njs_str("var let = 123;"
+              "let"),
+      njs_str("123") },
+
+    { njs_str("var const = 123"),
+      njs_str("SyntaxError: Unexpected token \"const\" in 1") },
+
+    /* Async */
+
+    { njs_str("var async;"
+              "function f() {"
+              "    async\n"
+              "    function foo() {}"
+              "}"
+              "f()"),
+      njs_str("undefined") },
+
+    { njs_str("var async;"
+              "function f() {"
+              "    async;"
+              "    function foo() {}"
+              "}"
+              "f()"),
+      njs_str("undefined") },
+
+    { njs_str("var async;"
+              "async\n"
+              "function foo() {}"),
+      njs_str("undefined") },
+
+    { njs_str("new\""),
+      njs_str("SyntaxError: Unterminated string \"\"\" in 1") },
+
+    { njs_str("new\"\\UFFFF"),
+      njs_str("SyntaxError: Unterminated string \"\"\\UFFFF\" in 1") },
+
+    { njs_str("new/la"),
+      njs_str("SyntaxError: Unterminated RegExp \"/la\" in 1") },
+
+    { njs_str("{name; {/ / /}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("[(]"),
+      njs_str("SyntaxError: Unexpected token \"]\" in 1") },
+
+    { njs_str("[...]"),
+      njs_str("SyntaxError: Unexpected token \"]\" in 1") },
+
+    { njs_str("switch () {}"),
+      njs_str("SyntaxError: Unexpected token \")\" in 1") },
+
+    { njs_str("switch ([(]) {}"),
+      njs_str("SyntaxError: Unexpected token \"]\" in 1") },
+
+    { njs_str("{{}{-}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}{+}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}{delete}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}{++}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}{++1}"),
+      njs_str("ReferenceError: Invalid left-hand side in prefix operation in 1") },
+
+    { njs_str("{{}{1++}"),
+      njs_str("ReferenceError: Invalid left-hand side in postfix operation in 1") },
+
+    { njs_str("{{}{1/}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}{1>>}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}{r=}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}{var a = }"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}T=>}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a = b +}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a = b -}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a = b *}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a = b /}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a = b %}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a = b++}"),
+      njs_str("ReferenceError: \"a\" is not defined in 1") },
+
+    { njs_str("{{}a = b--}"),
+      njs_str("ReferenceError: \"a\" is not defined in 1") },
+
+    { njs_str("{{}a =}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a +=}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a -=}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a *=}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a /=}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a %=}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a ===}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a ==}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a !=}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a !==}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a >}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a <}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a <=}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a &&}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a ||}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a ??}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a &}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a |}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a ^}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a <<}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}a >>}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}new}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}delete}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}void}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{}typeof}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("{{} ({a: 1, b: {}\n}\n})\n}"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 3") },
 };
 
 

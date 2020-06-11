@@ -125,6 +125,8 @@ njs_int_t
 njs_vm_compile(njs_vm_t *vm, u_char **start, u_char *end)
 {
     njs_int_t           ret;
+    njs_str_t           ast;
+    njs_chb_t           chain;
     njs_lexer_t         lexer;
     njs_parser_t        *parser, *prev;
     njs_generator_t     generator;
@@ -151,11 +153,12 @@ njs_vm_compile(njs_vm_t *vm, u_char **start, u_char *end)
         return NJS_ERROR;
     }
 
+    parser->vm = vm;
     parser->lexer = &lexer;
 
     njs_set_undefined(&vm->retval);
 
-    ret = njs_parser(vm, parser, prev);
+    ret = njs_parser(parser, prev);
     if (njs_slow_path(ret != NJS_OK)) {
         goto fail;
     }
@@ -201,7 +204,24 @@ njs_vm_compile(njs_vm_t *vm, u_char **start, u_char *end)
         njs_disassembler(vm);
     }
 
-    return NJS_OK;
+    if (njs_slow_path(vm->options.ast)) {
+        njs_chb_init(&chain, vm->mem_pool);
+        ret = njs_parser_serialize_ast(parser->node, &chain);
+        if (njs_slow_path(ret == NJS_ERROR)) {
+            return ret;
+        }
+
+        if (njs_slow_path(njs_chb_join(&chain, &ast) != NJS_OK)) {
+            return NJS_ERROR;
+        }
+
+        njs_print(ast.start, ast.length);
+
+        njs_chb_destroy(&chain);
+        njs_mp_free(vm->mem_pool, ast.start);
+    }
+
+    return ret;
 
 fail:
 
@@ -914,22 +934,12 @@ njs_vm_array_alloc(njs_vm_t *vm, njs_value_t *retval, uint32_t spare)
 njs_value_t *
 njs_vm_array_push(njs_vm_t *vm, njs_value_t *value)
 {
-    njs_int_t    ret;
-    njs_array_t  *array;
-
     if (njs_slow_path(!njs_is_array(value))) {
         njs_type_error(vm, "njs_vm_array_push() argument is not array");
         return NULL;
     }
 
-    array = njs_array(value);
-
-    ret = njs_array_expand(vm, array, 0, 1);
-    if (njs_slow_path(ret != NJS_OK)) {
-        return NULL;
-    }
-
-    return &array->start[array->length++];
+    return njs_array_push(vm, njs_array(value));
 }
 
 
