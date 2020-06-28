@@ -90,7 +90,7 @@ njs_vmcode_interpreter(njs_vm_t *vm, u_char *pc)
     njs_frame_t                  *frame;
     njs_jump_off_t               ret;
     njs_vmcode_this_t            *this;
-    njs_native_frame_t           *previous;
+    njs_native_frame_t           *previous, *native;
     njs_property_next_t          *next;
     njs_vmcode_generic_t         *vmcode;
     njs_vmcode_prop_get_t        *get;
@@ -645,7 +645,7 @@ next:
                     njs_internal_error(vm, "failed conversion of type \"%s\" "
                                        "to string while property define",
                                        njs_type_string(value2->type));
-                    return NJS_ERROR;
+                    goto error;
                 }
 
                 ret = njs_object_prop_define(vm, value1, &name, function,
@@ -705,13 +705,13 @@ next:
 
                 previous = njs_function_previous_frame(&frame->native);
 
-                njs_vm_scopes_restore(vm, frame, previous);
+                njs_vm_scopes_restore(vm, &frame->native, previous);
 
                 /*
                  * If a retval is in a callee arguments scope it
                  * must be in the previous callee arguments scope.
                  */
-                retval = njs_vmcode_operand(vm, frame->retval);
+                retval = njs_vmcode_operand(vm, frame->native.retval);
 
                 /*
                  * GC: value external/internal++ depending on
@@ -773,6 +773,8 @@ next:
                 break;
 
             case NJS_VMCODE_FUNCTION_CALL:
+                vm->active_frame->native.pc = pc;
+
                 ret = njs_function_frame_invoke(vm, (njs_index_t) value2);
                 if (njs_slow_path(ret == NJS_ERROR)) {
                     goto error;
@@ -867,8 +869,8 @@ next:
                     ret = njs_vmcode_try_end(vm, value1, value2);
 
                 } else {
-                    vm->top_frame->exception.catch =
-                                                  pc + (njs_jump_off_t) value2;
+                    frame = (njs_frame_t *) vm->top_frame;
+                    frame->exception.catch = pc + (njs_jump_off_t) value2;
                     ret = sizeof(njs_vmcode_catch_t);
                 }
 
@@ -902,32 +904,36 @@ next:
 error:
 
     if (njs_is_error(&vm->retval)) {
+        vm->active_frame->native.pc = pc;
         (void) njs_error_stack_attach(vm, &vm->retval);
     }
 
     for ( ;; ) {
-        frame = (njs_frame_t *) vm->top_frame;
+        native = vm->top_frame;
 
-        catch = frame->native.exception.catch;
+        if (!native->native) {
+            frame = (njs_frame_t *) native;
+            catch = frame->exception.catch;
 
-        if (catch != NULL) {
-            pc = catch;
+            if (catch != NULL) {
+                pc = catch;
 
-            goto next;
+                goto next;
+            }
         }
 
-        previous = frame->native.previous;
+        previous = native->previous;
         if (previous == NULL) {
             break;
         }
 
-        lambda_call = (frame == vm->active_frame);
+        lambda_call = (native == &vm->active_frame->native);
 
-        njs_vm_scopes_restore(vm, frame, previous);
+        njs_vm_scopes_restore(vm, native, previous);
 
-        if (frame->native.size != 0) {
-            vm->stack_size -= frame->native.size;
-            njs_mp_free(vm->mem_pool, frame);
+        if (native->size != 0) {
+            vm->stack_size -= native->size;
+            njs_mp_free(vm->mem_pool, native);
         }
 
         if (lambda_call) {
@@ -1687,13 +1693,13 @@ njs_vmcode_return(njs_vm_t *vm, njs_value_t *invld, njs_value_t *retval)
 
     previous = njs_function_previous_frame(&frame->native);
 
-    njs_vm_scopes_restore(vm, frame, previous);
+    njs_vm_scopes_restore(vm, &frame->native, previous);
 
     /*
      * If a retval is in a callee arguments scope it
      * must be in the previous callee arguments scope.
      */
-    retval = njs_vmcode_operand(vm, frame->retval);
+    retval = njs_vmcode_operand(vm, frame->native.retval);
 
     /* GC: value external/internal++ depending on value and retval type */
     *retval = *value;
@@ -1715,21 +1721,24 @@ njs_vmcode_try_start(njs_vm_t *vm, njs_value_t *exception_value,
     njs_value_t *offset, u_char *pc)
 {
     njs_value_t             *exit_value;
+    njs_frame_t             *frame;
     njs_exception_t         *e;
     njs_vmcode_try_start_t  *try_start;
 
-    if (vm->top_frame->exception.catch != NULL) {
+    frame = (njs_frame_t *) vm->top_frame;
+
+    if (frame->exception.catch != NULL) {
         e = njs_mp_alloc(vm->mem_pool, sizeof(njs_exception_t));
         if (njs_slow_path(e == NULL)) {
             njs_memory_error(vm);
             return NJS_ERROR;
         }
 
-        *e = vm->top_frame->exception;
-        vm->top_frame->exception.next = e;
+        *e = frame->exception;
+        frame->exception.next = e;
     }
 
-    vm->top_frame->exception.catch = pc + (njs_jump_off_t) offset;
+    frame->exception.catch = pc + (njs_jump_off_t) offset;
 
     njs_set_invalid(exception_value);
 
@@ -1784,15 +1793,17 @@ njs_vmcode_try_continue(njs_vm_t *vm, njs_value_t *exit_value,
 static njs_jump_off_t
 njs_vmcode_try_end(njs_vm_t *vm, njs_value_t *invld, njs_value_t *offset)
 {
+    njs_frame_t      *frame;
     njs_exception_t  *e;
 
-    e = vm->top_frame->exception.next;
+    frame = (njs_frame_t *) vm->top_frame;
+    e = frame->exception.next;
 
     if (e == NULL) {
-        vm->top_frame->exception.catch = NULL;
+        frame->exception.catch = NULL;
 
     } else {
-        vm->top_frame->exception = *e;
+        frame->exception = *e;
         njs_mp_free(vm->mem_pool, e);
     }
 

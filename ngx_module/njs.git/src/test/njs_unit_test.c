@@ -2828,6 +2828,9 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("var i; for (i in [1,2,3]) {Object.seal({});}"),
       njs_str("undefined") },
 
+    { njs_str("while (0) {continue\n}"),
+      njs_str("undefined") },
+
     /* break. */
 
     { njs_str("break"),
@@ -2895,6 +2898,9 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("var a = [1,2,3,4,5]; var s = 0, i;"
                  "for (i in a) if (a[i] > 4) break; s += a[i]; s"),
       njs_str("5") },
+
+    { njs_str("while (0) {break\n}"),
+      njs_str("undefined") },
 
     /* Labels. */
 
@@ -6323,6 +6329,9 @@ static njs_unit_test_t  njs_test[] =
                  "var person = 'Mike'; var age = 21;"
                  "foo`That ${person} is a ${age}`;"),
       njs_str("That  is a Mike21") },
+
+    { njs_str("`\n`.length"),
+      njs_str("1") },
 
     /* Strings. */
 
@@ -11704,7 +11713,7 @@ static njs_unit_test_t  njs_test[] =
       njs_str("RangeError: Maximum call stack size exceeded") },
 
     { njs_str("new Function(\"{[\".repeat(2**13));"),
-      njs_str("SyntaxError: Unexpected token \")\" in runtime:1") },
+      njs_str("SyntaxError: Unexpected token \"}\" in runtime:1") },
 
     { njs_str("new Function(\"{;\".repeat(2**13));"),
       njs_str("SyntaxError: Unexpected token \")\" in runtime:1") },
@@ -17010,6 +17019,30 @@ static njs_unit_test_t  njs_test[] =
 
     { njs_str("{{} ({a: 1, b: {}\n}\n})\n}"),
       njs_str("SyntaxError: Unexpected token \"}\" in 3") },
+
+    { njs_str("object?."),
+      njs_str("SyntaxError: Unexpected end of input in 1") },
+
+    { njs_str("`${{a: 1, b}}`"),
+      njs_str("ReferenceError: \"b\" is not defined in 1") },
+
+    { njs_str("`${{a: 1, b:}}`"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("`${{a: 1, b:,}}`"),
+      njs_str("SyntaxError: Unexpected token \",\" in 1") },
+
+    { njs_str("`${{a: 1, b: 2,}}`"),
+      njs_str("[object Object]") },
+
+    { njs_str("`${{a: 1,, b: 2}}`"),
+      njs_str("SyntaxError: Unexpected token \",\" in 1") },
+
+    { njs_str("`${{f(){-} - {}}`"),
+      njs_str("SyntaxError: Unexpected token \"}\" in 1") },
+
+    { njs_str("for (;1-;) {}"),
+      njs_str("SyntaxError: Unexpected token \";\" in 1") },
 };
 
 
@@ -17601,13 +17634,317 @@ static njs_unit_test_t  njs_regexp_test[] =
 };
 
 
+static njs_unit_test_t  njs_shell_test[] =
+{
+#define ENTER "\n\3"
+
+    { njs_str("var a = 3" ENTER
+              "a * 2" ENTER),
+      njs_str("6") },
+
+    { njs_str("var a = \"aa\\naa\"" ENTER
+              "a" ENTER),
+      njs_str("aa\naa") },
+
+    { njs_str("var a = 3" ENTER
+              "var a = 'str'" ENTER
+              "a" ENTER),
+      njs_str("str") },
+
+    { njs_str("var a = 2" ENTER
+              "a *= 2" ENTER
+              "a *= 2" ENTER
+              "a *= 2" ENTER),
+      njs_str("16") },
+
+    { njs_str("var a = 2" ENTER
+              "var b = 3" ENTER
+              "a * b" ENTER),
+      njs_str("6") },
+
+    { njs_str("var a = 2; var b = 3;" ENTER
+              "a * b" ENTER),
+      njs_str("6") },
+
+    { njs_str("function sq(f) { return f() * f() }" ENTER
+               "sq(function () { return 3 })" ENTER),
+      njs_str("9") },
+
+    /* Temporary indexes */
+
+    { njs_str("var a = [1,2,3], i; for (i in a) {Object.seal({});}" ENTER),
+      njs_str("undefined") },
+
+    { njs_str("var i; for (i in [1,2,3]) {Object.seal({});}" ENTER),
+      njs_str("undefined") },
+
+    { njs_str("var a = 'A'; "
+              "switch (a) {"
+              "case 0: a += '0';"
+              "case 1: a += '1';"
+              "}; a" ENTER),
+      njs_str("A") },
+
+    { njs_str("var a = 0; try { a = 5 }"
+              "catch (e) { a = 9 } finally { a++ } a" ENTER),
+      njs_str("6") },
+
+    { njs_str("/abc/i.test('ABC')" ENTER),
+      njs_str("true") },
+
+    /* Accumulative mode. */
+
+    { njs_str("var a = 1" ENTER
+              "a" ENTER),
+      njs_str("1") },
+
+    { njs_str("Number.prototype.test = 'test'" ENTER
+              "Number.prototype.test" ENTER),
+      njs_str("test") },
+
+    /* Error handling */
+
+    { njs_str("var a = ;" ENTER
+              "2 + 2" ENTER),
+      njs_str("4") },
+
+    { njs_str("function f() { return b;" ENTER),
+      njs_str("SyntaxError: Unexpected end of input in 1") },
+
+    { njs_str("function f() { return b;" ENTER
+               "2 + 2" ENTER),
+      njs_str("4") },
+
+    { njs_str("function f() { return function() { return 1" ENTER
+              "2 + 2" ENTER),
+      njs_str("4") },
+
+    { njs_str("function f() { return b;}" ENTER
+              "2 + 2" ENTER),
+      njs_str("4") },
+
+    { njs_str("function f(o) { return o.a.a;}; f{{}}" ENTER
+              "2 + 2" ENTER),
+      njs_str("4") },
+
+    { njs_str("function ff(o) {return o.a.a}" ENTER
+              "function f(o) {try {return ff(o)} "
+              "               finally {return 1}}" ENTER
+              "f({})" ENTER),
+      njs_str("1") },
+
+    { njs_str("arguments" ENTER
+              "function(){}()" ENTER),
+      njs_str("SyntaxError: Unexpected token \"(\" in 1") },
+
+    /* Backtraces */
+
+    { njs_str("function ff(o) {return o.a.a}" ENTER
+              "function f(o) {return ff(o)}" ENTER
+              "f({})" ENTER),
+      njs_str("TypeError: cannot get property \"a\" of undefined\n"
+              "    at ff (:1)\n"
+              "    at f (:1)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("function ff(o) {return o.a.a}" ENTER
+              "function f(o) {try {return ff(o)} "
+              "               finally {return o.a.a}}" ENTER
+              "f({})" ENTER),
+      njs_str("TypeError: cannot get property \"a\" of undefined\n"
+              "    at f (:1)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("function f(ff, o) {return ff(o)}" ENTER
+              "f(function (o) {return o.a.a}, {})" ENTER),
+      njs_str("TypeError: cannot get property \"a\" of undefined\n"
+              "    at anonymous (:1)\n"
+              "    at f (:1)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("'str'.replace(/t/g,"
+              "              function(m) {return m.a.a})" ENTER),
+      njs_str("TypeError: cannot get property \"a\" of undefined\n"
+              "    at anonymous (:1)\n"
+              "    at String.prototype.replace (native)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("function f(o) {return Object.keys(o)}" ENTER
+              "f()" ENTER),
+      njs_str("TypeError: cannot convert undefined argument to object\n"
+              "    at Object.keys (native)\n"
+              "    at f (:1)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("''.repeat(-1)" ENTER),
+      njs_str("RangeError\n"
+              "    at String.prototype.repeat (native)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("Math.log({}.a.a)" ENTER),
+      njs_str("TypeError: cannot get property \"a\" of undefined\n"
+              "    at Math.log (native)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("var bound = Math.max.bind(null, {toString(){return {}}}); bound(1)" ENTER),
+      njs_str("TypeError: Cannot convert object to primitive value\n"
+              "    at Math.max (native)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("Object.prototype()" ENTER),
+      njs_str("TypeError: (intermediate value)[\"prototype\"] is not a function\n"
+               "    at main (:1)\n") },
+
+    { njs_str("eval()" ENTER),
+      njs_str("InternalError: Not implemented\n"
+              "    at eval (native)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("$r.method({}.a.a)" ENTER),
+      njs_str("TypeError: cannot get property \"a\" of undefined\n"
+              "    at $r3.method (native)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("new Function(\n\n@)" ENTER),
+      njs_str("SyntaxError: Unexpected token \"@\" in 3") },
+
+    { njs_str("require()" ENTER),
+      njs_str("TypeError: missing path\n"
+              "    at require (native)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("setTimeout()" ENTER),
+      njs_str("TypeError: too few arguments\n"
+              "    at setTimeout (native)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("require('crypto').createHash('sha')" ENTER),
+      njs_str("TypeError: not supported algorithm: \"sha\"\n"
+              "    at crypto.createHash (native)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("var h = require('crypto').createHash('sha1')" ENTER
+              "h.update([])" ENTER),
+      njs_str("TypeError: data must be a string\n"
+              "    at Hash.prototype.update (native)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("require('crypto').createHmac('sha1', [])" ENTER),
+      njs_str("TypeError: key must be a string\n"
+              "    at crypto.createHmac (native)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("var h = require('crypto').createHmac('sha1', 'secret')" ENTER
+              "h.update([])" ENTER),
+      njs_str("TypeError: data must be a string\n"
+              "    at Hmac.prototype.update (native)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("function f(o) {function f_in(o) {return o.a.a};"
+              "               return f_in(o)}; f({})" ENTER),
+      njs_str("TypeError: cannot get property \"a\" of undefined\n"
+              "    at f_in (:1)\n"
+              "    at f (:1)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("function f(o) {var ff = function (o) {return o.a.a};"
+              "               return ff(o)}; f({})" ENTER),
+      njs_str("TypeError: cannot get property \"a\" of undefined\n"
+              "    at anonymous (:1)\n"
+              "    at f (:1)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("var fs = require('fs');"
+              "["
+              " 'access',"
+              " 'accessSync',"
+              " 'readFile',"
+              " 'readFileSync',"
+              " 'writeFile',"
+              " 'writeFileSync',"
+              " 'appendFile',"
+              " 'appendFileSync',"
+              " 'symlink',"
+              " 'symlinkSync',"
+              " 'unlink',"
+              " 'unlinkSync',"
+              " 'realpath',"
+              " 'realpathSync',"
+              "]"
+              ".every(v=>{ try {fs[v]();} catch (e) { return e.stack.search(`fs.${v} `) >= 0}})" ENTER),
+      njs_str("true") },
+
+    { njs_str("parseInt({ toString: function() { return [1] } })" ENTER),
+      njs_str("TypeError: Cannot convert object to primitive value\n"
+              "    at parseInt (native)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("function f(n) { if (n == 0) { throw 'a'; } return f(n-1); }; f(2)" ENTER),
+      njs_str("a") },
+
+    /* Exception in njs_vm_retval_string() */
+
+    { njs_str("var o = { toString: function() { return [1] } }" ENTER
+              "o" ENTER),
+      njs_str("TypeError: Cannot convert object to primitive value") },
+
+    /* line numbers */
+
+    { njs_str("/**/(function(){throw Error();})()" ENTER),
+      njs_str("Error\n"
+              "    at anonymous (:1)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("/***/(function(){throw Error();})()" ENTER),
+      njs_str("Error\n"
+              "    at anonymous (:1)\n"
+              "    at main (:1)\n") },
+
+    { njs_str("/*\n**/(function(){throw Error();})()" ENTER),
+      njs_str("Error\n"
+              "    at anonymous (:2)\n"
+              "    at main (:2)\n") },
+
+    { njs_str("({})\n.a\n.a" ENTER),
+      njs_str("TypeError: cannot get property \"a\" of undefined\n"
+              "    at main (:3)\n") },
+
+    { njs_str("1\n+a" ENTER),
+      njs_str("ReferenceError: \"a\" is not defined in 2\n"
+              "    at main (:2)\n") },
+
+    { njs_str("\n`\n${Object}\n${a}`" ENTER),
+      njs_str("ReferenceError: \"a\" is not defined in 4\n"
+              "    at main (:4)\n") },
+
+    { njs_str("function log(v) {}\nlog({}\n.a\n.a)" ENTER),
+      njs_str("TypeError: cannot get property \"a\" of undefined\n"
+              "    at main (:4)\n") },
+
+    { njs_str("\nfor (var i = 0;\n i < a;\n i++) { }\n" ENTER),
+      njs_str("ReferenceError: \"a\" is not defined in 3\n"
+              "    at main (:3)\n") },
+
+    { njs_str("\nfor (var i = 0;\n i < 5;\n a) {\n }" ENTER),
+      njs_str("ReferenceError: \"a\" is not defined in 4\n"
+              "    at main (:4)\n") },
+
+    { njs_str("Math\n.min(1,\na)" ENTER),
+      njs_str("ReferenceError: \"a\" is not defined in 3\n"
+              "    at Math.min (native)\n"
+              "    at main (:3)\n") },
+};
+
+
 typedef struct {
     njs_bool_t  disassemble;
+    njs_str_t   filter;
     njs_bool_t  verbose;
-    njs_bool_t  unsafe;
+
+    njs_uint_t  externals;
     njs_bool_t  module;
     njs_uint_t  repeat;
-    njs_uint_t  externals;
+    njs_bool_t  unsafe;
 } njs_opts_t;
 
 
@@ -17618,20 +17955,21 @@ typedef struct {
 
 
 static void
-njs_unit_test_report(const char *msg, njs_stat_t *prev, njs_stat_t *current)
+njs_unit_test_report(njs_str_t *name, njs_stat_t *prev, njs_stat_t *current)
 {
     njs_stat_t  stat;
 
     stat.failed = current->failed - prev->failed;
     stat.passed = current->passed - prev->passed;
 
-    njs_printf("%s: %s [%d/%d]\n", msg, stat.failed ? "FAILED" : "PASSED",
-               stat.passed, stat.passed + stat.failed);
+    njs_printf("%V tests: %s [%d/%d]\n", name,
+               stat.failed ? "FAILED" : "PASSED", stat.passed,
+               stat.passed + stat.failed);
 }
 
 
 static njs_int_t
-njs_unit_test(njs_unit_test_t tests[], size_t num, const char *name,
+njs_unit_test(njs_unit_test_t tests[], size_t num, njs_str_t *name,
     njs_opts_t *opts, njs_stat_t *stat)
 {
     u_char                *start, *end;
@@ -17767,7 +18105,109 @@ done:
 
 
 static njs_int_t
-njs_timezone_optional_test(njs_opts_t *opts, njs_stat_t *stat)
+njs_interactive_test(njs_unit_test_t tests[], size_t num, njs_str_t *name,
+    njs_opts_t *opts, njs_stat_t *stat)
+{
+    u_char        *start, *last, *end;
+    njs_vm_t      *vm;
+    njs_int_t     ret;
+    njs_str_t     s;
+    njs_uint_t    i;
+    njs_stat_t    prev;
+    njs_bool_t    success;
+    njs_vm_opt_t  options;
+
+    vm = NULL;
+
+    prev = *stat;
+
+    ret = NJS_ERROR;
+
+    for (i = 0; i < num; i++) {
+
+        if (opts->verbose) {
+            njs_printf("\"%V\"\n", &tests[i].script);
+        }
+
+        njs_vm_opt_init(&options);
+
+        options.init = 1;
+        options.accumulative = 1;
+        options.backtrace = 1;
+
+        vm = njs_vm_create(&options);
+        if (vm == NULL) {
+            njs_printf("njs_vm_create() failed\n");
+            goto done;
+        }
+
+        if (opts->externals) {
+            ret = njs_externals_init(vm, NULL);
+            if (ret != NJS_OK) {
+                goto done;
+            }
+        }
+
+        start = tests[i].script.start;
+        last = start + tests[i].script.length;
+        end = NULL;
+
+        for ( ;; ) {
+            start = (end != NULL) ? end + njs_length(ENTER) : start;
+            if (start >= last) {
+                break;
+            }
+
+            end = (u_char *) strstr((char *) start, ENTER);
+
+            ret = njs_vm_compile(vm, &start, end);
+            if (ret == NJS_OK) {
+                if (opts->disassemble) {
+                    njs_disassembler(vm);
+                }
+
+                ret = njs_vm_start(vm);
+            }
+        }
+
+        if (njs_vm_retval_string(vm, &s) != NJS_OK) {
+            njs_printf("njs_vm_retval_string() failed\n");
+            goto done;
+        }
+
+        success = njs_strstr_eq(&tests[i].ret, &s);
+
+        if (!success) {
+            njs_printf("njs(\"%V\")\nexpected: \"%V\"\n     got: \"%V\"\n",
+                       &tests[i].script, &tests[i].ret, &s);
+
+            stat->failed++;
+
+        } else {
+            stat->passed++;
+        }
+
+        njs_vm_destroy(vm);
+        vm = NULL;
+    }
+
+    ret = NJS_OK;
+
+done:
+
+    if (vm != NULL) {
+        njs_vm_destroy(vm);
+    }
+
+    njs_unit_test_report(name, &prev, stat);
+
+    return ret;
+}
+
+
+static njs_int_t
+njs_timezone_optional_test(njs_unit_test_t tests[], size_t num, njs_str_t *name,
+    njs_opts_t *opts, njs_stat_t *stat)
 {
     size_t     size;
     u_char     buf[16];
@@ -17788,8 +18228,7 @@ njs_timezone_optional_test(njs_opts_t *opts, njs_stat_t *stat)
     size = strftime((char *) buf, sizeof(buf), "%z", &tm);
 
     if (memcmp(buf, "+1245", size) == 0) {
-        ret = njs_unit_test(njs_tz_test, njs_nitems(njs_tz_test),
-                            "timezone tests", opts, stat);
+        ret = njs_unit_test(tests, num, name, opts, stat);
         if (ret != NJS_OK) {
             return ret;
         }
@@ -17803,7 +18242,8 @@ njs_timezone_optional_test(njs_opts_t *opts, njs_stat_t *stat)
 
 
 static njs_int_t
-njs_regexp_optional_test(njs_opts_t *opts, njs_stat_t *stat)
+njs_regexp_optional_test(njs_unit_test_t tests[], size_t num, njs_str_t *name,
+    njs_opts_t *opts, njs_stat_t *stat)
 {
     int         erroff;
     pcre        *re1, *re2;
@@ -17828,8 +18268,7 @@ njs_regexp_optional_test(njs_opts_t *opts, njs_stat_t *stat)
                        &errstr, &erroff, NULL);
 
     if (re1 == NULL && re2 != NULL) {
-        ret = njs_unit_test(njs_regexp_test, njs_nitems(njs_regexp_test),
-                            "unicode regexp tests", opts, stat);
+        ret = njs_unit_test(tests, num, name, opts, stat);
         if (ret != NJS_OK) {
             return ret;
         }
@@ -17851,7 +18290,8 @@ njs_regexp_optional_test(njs_opts_t *opts, njs_stat_t *stat)
 
 
 static njs_int_t
-njs_vm_json_test(njs_opts_t *opts, njs_stat_t *stat)
+njs_vm_json_test(njs_unit_test_t unused[], size_t num, njs_str_t *name,
+    njs_opts_t *opts, njs_stat_t *stat)
 {
     njs_vm_t      *vm;
     njs_int_t     ret;
@@ -17969,7 +18409,7 @@ done:
         }
     }
 
-    njs_unit_test_report("VM json API tests", &prev, stat);
+    njs_unit_test_report(name, &prev, stat);
 
     if (vm != NULL) {
         njs_vm_destroy(vm);
@@ -17980,7 +18420,8 @@ done:
 
 
 static njs_int_t
-njs_vm_value_test(njs_opts_t *opts, njs_stat_t *stat)
+njs_vm_value_test(njs_unit_test_t unused[], size_t num, njs_str_t *name,
+    njs_opts_t *opts, njs_stat_t *stat)
 {
     njs_vm_t      *vm;
     njs_int_t     ret;
@@ -18124,7 +18565,7 @@ done:
         }
     }
 
-    njs_unit_test_report("njs_vm_value() tests", &prev, stat);
+    njs_unit_test_report(name, &prev, stat);
 
     if (vm != NULL) {
         njs_vm_destroy(vm);
@@ -18622,7 +19063,8 @@ njs_string_to_index_test(njs_vm_t *vm, njs_opts_t *opts, njs_stat_t *stat)
 
 
 static njs_int_t
-njs_api_test(njs_opts_t *opts, njs_stat_t *stat)
+njs_vm_internal_api_test(njs_unit_test_t unused[], size_t num, njs_str_t *name,
+    njs_opts_t *opts, njs_stat_t *stat)
 {
     njs_vm_t      *vm;
     njs_int_t     ret;
@@ -18676,7 +19118,7 @@ njs_api_test(njs_opts_t *opts, njs_stat_t *stat)
 
 done:
 
-    njs_unit_test_report("API tests", &prev, stat);
+    njs_unit_test_report(name, &prev, stat);
 
     if (vm != NULL) {
         njs_vm_destroy(vm);
@@ -18686,120 +19128,257 @@ done:
 }
 
 
-int njs_cdecl
-main(int argc, char **argv)
+static njs_int_t
+njs_get_options(njs_opts_t *opts, int argc, char **argv)
 {
-    njs_int_t   ret;
-    njs_opts_t  opts;
-    njs_stat_t  stat;
+    char       *p;
+    njs_int_t  i;
 
-    njs_memzero(&opts, sizeof(njs_opts_t));
+    static const char  help[] =
+        "njs unit tests.\n"
+        "\n"
+        "njs_unit_test [options]"
+        "\n"
+        "Options:\n"
+        "  -d                           print disassembled code.\n"
+        "  -f PATTERN1[|PATTERN2..]     filter test suites to run.\n"
+        "  -v                           verbose mode.\n";
 
-    if (argc > 1) {
-        switch (argv[1][0]) {
+    for (i = 1; i < argc; i++) {
+
+        p = argv[i];
+
+        if (p[0] != '-') {
+            goto help;
+        }
+
+        p++;
+
+        switch (*p) {
+        case '?':
+        case 'h':
+            (void) write(STDOUT_FILENO, help, njs_length(help));
+            return NJS_DONE;
 
         case 'd':
-            opts.disassemble = 1;
+            opts->disassemble = 1;
             break;
 
+        case 'f':
+            if (++i < argc) {
+                opts->filter.start = (u_char *) argv[i];
+                opts->filter.length = njs_strlen(argv[i]);
+                break;
+            }
+
+            njs_stderror("option \"-f\" requires argument\n");
+            return NJS_ERROR;
+
         case 'v':
-            opts.verbose = 1;
+            opts->verbose = 1;
             break;
 
         default:
+            goto help;
+        }
+    }
+
+    return NJS_OK;
+
+help:
+
+    njs_stderror("Unknown argument: \"%s\" "
+                 "try \"%s -h\" for available options\n", argv[i],
+                 argv[0]);
+
+    return NJS_ERROR;
+}
+
+
+static njs_int_t
+njs_match_test(njs_opts_t *opts, njs_str_t *name)
+{
+    u_char  *p, *start, *end;
+    size_t  len;
+
+    if (name->length == 0) {
+        return 0;
+    }
+
+    if (opts->filter.length == 0) {
+        return 1;
+    }
+
+    start = opts->filter.start;
+    end = start + opts->filter.length;
+
+    for ( ;; ) {
+        p = njs_strlchr(start, end, '|');
+        len = ((p != NULL) ? p : end) - start;
+        len = njs_min(name->length, len);
+
+        if (len != 0 && njs_strncmp(name->start, start, len) == 0) {
+            return 1;
+        }
+
+        if (p == NULL) {
             break;
         }
+
+        start = p + 1;
+    }
+
+    return 0;
+}
+
+
+typedef struct {
+    njs_str_t        name;
+    njs_opts_t       opts;
+    njs_unit_test_t  *tests;
+    size_t           n;
+    njs_int_t        (*run)(njs_unit_test_t tests[], size_t num,
+                            njs_str_t *name, njs_opts_t *opts,
+                            njs_stat_t *stat);
+} njs_test_suite_t;
+
+
+static njs_int_t
+njs_disabled_denormals_tests(njs_unit_test_t tests[], size_t num,
+    njs_str_t *name, njs_opts_t *opts, njs_stat_t *stat)
+{
+    njs_int_t  ret;
+
+    njs_mm_denormals(0);
+
+    ret = njs_unit_test(tests, num, name, opts, stat);
+
+    njs_mm_denormals(1);
+
+    return ret;
+}
+
+
+static njs_test_suite_t  njs_suites[] =
+{
+    { njs_str("script"),
+      { .repeat = 1, .unsafe = 1 },
+      njs_test,
+      njs_nitems(njs_test),
+      njs_unit_test },
+
+    { njs_str("denormals"),
+      { .repeat = 1, .unsafe = 1 },
+      njs_denormals_test,
+      njs_nitems(njs_denormals_test),
+      njs_unit_test },
+
+    {
+#if (NJS_HAVE_DENORMALS_CONTROL)
+        njs_str("disabled denormals"),
+#else
+        njs_str(""),
+#endif
+      { .repeat = 1, .unsafe = 1 },
+      njs_disabled_denormals_test,
+      njs_nitems(njs_disabled_denormals_test),
+      njs_disabled_denormals_tests },
+
+    { njs_str("module"),
+      { .repeat = 1, .module = 1, .unsafe = 1 },
+      njs_module_test,
+      njs_nitems(njs_module_test),
+      njs_unit_test },
+
+    { njs_str("externals"),
+      { .externals = 1, .repeat = 1, .unsafe = 1 },
+      njs_externals_test,
+      njs_nitems(njs_externals_test),
+      njs_unit_test },
+
+    { njs_str("shared"),
+      { .externals = 1, .repeat = 128, .unsafe = 1 },
+      njs_shared_test,
+      njs_nitems(njs_shared_test),
+      njs_unit_test },
+
+    { njs_str("interactive"),
+      { .externals = 1, .repeat = 1, .unsafe = 1 },
+      njs_shell_test,
+      njs_nitems(njs_shell_test),
+      njs_interactive_test },
+
+    { njs_str("timezone"),
+      { .repeat = 1, .unsafe = 1 },
+      njs_tz_test,
+      njs_nitems(njs_tz_test),
+      njs_timezone_optional_test },
+
+    { njs_str("regexp"),
+      { .repeat = 1, .unsafe = 1 },
+      njs_regexp_test,
+      njs_nitems(njs_regexp_test),
+      njs_regexp_optional_test },
+
+    { njs_str("vm_json"),
+      { .repeat = 1, .unsafe = 1 },
+      NULL,
+      0,
+      njs_vm_json_test },
+
+    { njs_str("vm_value"),
+      { .repeat = 1, .unsafe = 1 },
+      NULL,
+      0,
+      njs_vm_value_test },
+
+    { njs_str("vm_internal_api"),
+      { .repeat = 1, .unsafe = 1 },
+      NULL,
+      0,
+      njs_vm_internal_api_test },
+};
+
+
+int njs_cdecl
+main(int argc, char **argv)
+{
+    njs_int_t         ret;
+    njs_uint_t        i;
+    njs_opts_t        opts, op;
+    njs_stat_t        stat;
+    njs_test_suite_t  *suite;
+
+    njs_memzero(&opts, sizeof(njs_opts_t));
+
+    ret = njs_get_options(&opts, argc, argv);
+    if (ret != NJS_OK) {
+        return (ret == NJS_DONE) ? EXIT_SUCCESS: EXIT_FAILURE;
     }
 
     (void) putenv((char *) "TZ=UTC");
     tzset();
 
+    njs_mm_denormals(1);
+
     njs_memzero(&stat, sizeof(njs_stat_t));
 
-    opts.repeat = 1;
-    opts.unsafe = 1;
+    for (i = 0; i < njs_nitems(njs_suites); i++) {
+        suite = &njs_suites[i];
 
-    njs_mm_denormals(1);
+        if (!njs_match_test(&opts, &suite->name)) {
+            continue;
+        }
 
-    ret = njs_unit_test(njs_test, njs_nitems(njs_test), "script tests",
-                        &opts, &stat);
-    if (ret != NJS_OK) {
-        return ret;
-    }
+        op = suite->opts;
 
-    ret = njs_unit_test(njs_denormals_test, njs_nitems(njs_denormals_test),
-                        "denormals tests", &opts, &stat);
-    if (ret != NJS_OK) {
-        return ret;
-    }
+        op.verbose = opts.verbose;
+        op.disassemble = opts.disassemble;
 
-#if (NJS_HAVE_DENORMALS_CONTROL)
-
-    njs_mm_denormals(0);
-
-    ret = njs_unit_test(njs_disabled_denormals_test,
-                        njs_nitems(njs_disabled_denormals_test),
-                        "disabled denormals tests", &opts, &stat);
-    if (ret != NJS_OK) {
-        return ret;
-    }
-
-    njs_mm_denormals(1);
-
-#else
-
-    (void) njs_disabled_denormals_test;
-
-#endif
-
-    ret = njs_timezone_optional_test(&opts, &stat);
-    if (ret != NJS_OK) {
-        return ret;
-    }
-
-    ret = njs_regexp_optional_test(&opts, &stat);
-    if (ret != NJS_OK) {
-        return ret;
-    }
-
-    ret = njs_vm_json_test(&opts, &stat);
-    if (ret != NJS_OK) {
-        return ret;
-    }
-
-    ret = njs_vm_value_test(&opts, &stat);
-    if (ret != NJS_OK) {
-        return ret;
-    }
-
-    ret = njs_api_test(&opts, &stat);
-    if (ret != NJS_OK) {
-        return ret;
-    }
-
-    opts.module = 1;
-
-    ret = njs_unit_test(njs_module_test, njs_nitems(njs_module_test),
-                        "module tests", &opts, &stat);
-    if (ret != NJS_OK) {
-        return ret;
-    }
-
-    opts.module = 0;
-    opts.externals = 1;
-
-    ret = njs_unit_test(njs_externals_test, njs_nitems(njs_externals_test),
-                        "externals tests", &opts, &stat);
-    if (ret != NJS_OK) {
-        return ret;
-    }
-
-    opts.repeat = 128;
-
-    ret = njs_unit_test(njs_shared_test, njs_nitems(njs_shared_test),
-                        "shared tests", &opts, &stat);
-    if (ret != NJS_OK) {
-        return ret;
+        ret = suite->run(suite->tests, suite->n, &suite->name, &op, &stat);
+        if (ret != NJS_OK) {
+            return ret;
+        }
     }
 
     njs_printf("TOTAL: %s [%ui/%ui]\n", stat.failed ? "FAILED" : "PASSED",

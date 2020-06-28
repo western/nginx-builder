@@ -370,6 +370,8 @@ njs_function_native_frame(njs_vm_t *vm, njs_function_t *function,
     frame->function = function;
     frame->nargs = function->args_offset + nargs;
     frame->ctor = ctor;
+    frame->native = 1;
+    frame->pc = NULL;
 
     value = (njs_value_t *) ((u_char *) frame + NJS_NATIVE_FRAME_SIZE);
     frame->arguments = value;
@@ -452,6 +454,8 @@ njs_function_lambda_frame(njs_vm_t *vm, njs_function_t *function,
     native_frame->function = target;
     native_frame->nargs = nargs;
     native_frame->ctor = ctor;
+    native_frame->native = 0;
+    native_frame->pc = NULL;
 
     /* Function arguments. */
 
@@ -501,6 +505,8 @@ njs_function_lambda_frame(njs_vm_t *vm, njs_function_t *function,
     }
 
     frame = (njs_frame_t *) native_frame;
+    frame->exception.catch = NULL;
+    frame->exception.next = NULL;
     frame->local = value;
     frame->previous_active_frame = vm->active_frame;
 
@@ -677,13 +683,11 @@ njs_function_native_call(njs_vm_t *vm)
 {
     njs_int_t              ret;
     njs_value_t            *value;
-    njs_frame_t            *frame;
     njs_function_t         *function, *target;
     njs_native_frame_t     *native, *previous;
     njs_function_native_t  call;
 
     native = vm->top_frame;
-    frame = (njs_frame_t *) native;
     function = native->function;
 
     if (njs_fast_path(function->bound == NULL)) {
@@ -711,10 +715,10 @@ njs_function_native_call(njs_vm_t *vm)
 
     previous = njs_function_previous_frame(native);
 
-    njs_vm_scopes_restore(vm, frame, previous);
+    njs_vm_scopes_restore(vm, native, previous);
 
     if (!native->skip) {
-        value = njs_vmcode_operand(vm, frame->retval);
+        value = njs_vmcode_operand(vm, native->retval);
         /*
          * GC: value external/internal++ depending
          * on vm->retval and retval type
@@ -849,11 +853,11 @@ njs_function_constructor(njs_vm_t *vm, njs_value_t *args, njs_uint_t nargs,
     njs_value_t            *body;
     njs_lexer_t            lexer;
     njs_parser_t           *parser;
+    njs_vm_code_t          *code;
     njs_function_t         *function;
     njs_generator_t        generator;
     njs_parser_scope_t     *scope;
     njs_function_lambda_t  *lambda;
-    njs_vmcode_function_t  *code;
 
     if (!vm->options.unsafe) {
         body = njs_argument(args, nargs - 1);
@@ -947,15 +951,18 @@ njs_function_constructor(njs_vm_t *vm, njs_value_t *args, njs_uint_t nargs,
 
     njs_memzero(&generator, sizeof(njs_generator_t));
 
-    ret = njs_generate_scope(vm, &generator, scope, &njs_entry_anonymous);
-    if (njs_slow_path(ret != NJS_OK)) {
-        return ret;
+    code = njs_generate_scope(vm, &generator, scope, &njs_entry_anonymous);
+    if (njs_slow_path(code == NULL)) {
+        if (!njs_is_error(&vm->retval)) {
+            njs_internal_error(vm, "njs_generate_scope() failed");
+        }
+
+        return NJS_ERROR;
     }
 
     njs_chb_destroy(&chain);
 
-    code = (njs_vmcode_function_t *) generator.code_start;
-    lambda = code->lambda;
+    lambda = ((njs_vmcode_function_t *) generator.code_start)->lambda;
 
     function = njs_function_alloc(vm, lambda, NULL, 0);
     if (njs_slow_path(function == NULL)) {
@@ -1035,10 +1042,10 @@ static njs_int_t
 njs_function_prototype_call(njs_vm_t *vm, njs_value_t *args, njs_uint_t nargs,
     njs_index_t unused)
 {
-    njs_int_t          ret;
-    njs_frame_t        *frame;
-    njs_function_t     *function;
-    const njs_value_t  *this;
+    njs_int_t           ret;
+    njs_function_t      *function;
+    const njs_value_t   *this;
+    njs_native_frame_t  *frame;
 
     if (!njs_is_function(&args[0])) {
         njs_type_error(vm, "\"this\" argument is not a function");
@@ -1054,12 +1061,12 @@ njs_function_prototype_call(njs_vm_t *vm, njs_value_t *args, njs_uint_t nargs,
         nargs = 0;
     }
 
-    frame = (njs_frame_t *) vm->top_frame;
-
-    function = njs_function(&args[0]);
+    frame = vm->top_frame;
 
     /* Skip the "call" method frame. */
-    vm->top_frame->skip = 1;
+    frame->skip = 1;
+
+    function = njs_function(&args[0]);
 
     ret = njs_function_frame(vm, function, this, &args[2], nargs, 0);
     if (njs_slow_path(ret != NJS_OK)) {
@@ -1144,7 +1151,7 @@ activate:
         return ret;
     }
 
-    ret = njs_function_frame_invoke(vm, frame->retval);
+    ret = njs_function_frame_invoke(vm, frame->native.retval);
     if (njs_slow_path(ret != NJS_OK)) {
         return ret;
     }

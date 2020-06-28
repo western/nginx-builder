@@ -1141,7 +1141,7 @@ njs_parser_primary_expression_test(njs_parser_t *parser,
         parser->node = node;
 
         njs_parser_next(parser, njs_parser_template_literal);
-        break;
+        return NJS_OK;
 
     /* CoverParenthesizedExpressionAndArrowParameterList */
     case NJS_TOKEN_OPEN_PARENTHESIS:
@@ -1321,6 +1321,9 @@ njs_parser_template_literal(njs_parser_t *parser, njs_lexer_token_t *token,
     temp->index = index;
 
     parser->target = temp;
+
+    token->text.start++;
+    token->text.length = 0;
 
     njs_parser_next(parser, njs_parser_template_literal_string);
 
@@ -1691,7 +1694,7 @@ njs_parser_object_literal(njs_parser_t *parser, njs_lexer_token_t *token,
 
     njs_parser_next(parser, njs_parser_property_definition_list);
 
-    return njs_parser_after(parser, current, node, 0,
+    return njs_parser_after(parser, current, node, 1,
                             njs_parser_object_literal_after);
 }
 
@@ -1730,7 +1733,7 @@ njs_parser_property_definition_list(njs_parser_t *parser,
 {
     njs_parser_next(parser, njs_parser_property_definition);
 
-    return njs_parser_after(parser, current, parser->target, 0,
+    return njs_parser_after(parser, current, parser->target, 1,
                             njs_parser_property_definition_list_after);
 }
 
@@ -1747,7 +1750,7 @@ njs_parser_property_definition_list_after(njs_parser_t *parser,
 
     njs_parser_next(parser, njs_parser_property_definition);
 
-    return njs_parser_after(parser, current, parser->target, 0,
+    return njs_parser_after(parser, current, parser->target, 1,
                             njs_parser_property_definition_list_after);
 }
 
@@ -1863,6 +1866,9 @@ njs_parser_property_definition(njs_parser_t *parser, njs_lexer_token_t *token,
     temp = parser->target;
 
     switch (token->type) {
+    case NJS_TOKEN_CLOSE_BRACE:
+        return njs_parser_stack_pop(parser);
+
     /* PropertyName */
     case NJS_TOKEN_STRING:
     case NJS_TOKEN_ESCAPE_STRING:
@@ -2198,8 +2204,6 @@ njs_parser_property(njs_parser_t *parser, njs_lexer_token_t *token,
         node->token_line = token->line;
 
         parser->node = node;
-
-        njs_lexer_consume_token(parser->lexer, 1);
 
         njs_parser_next(parser, njs_parser_template_literal);
 
@@ -2881,10 +2885,6 @@ njs_parser_optional_chain(njs_parser_t *parser, njs_lexer_token_t *token,
         break;
 
     default:
-        if (!njs_lexer_token_is_identifier_name(token)) {
-            njs_lexer_consume_token(parser->lexer, 1);
-        }
-
         ret = njs_parser_property(parser, token, current);
 
         switch (ret) {
@@ -5218,7 +5218,7 @@ njs_parser_iteration_statement_for_map(njs_parser_t *parser,
 
             njs_parser_next(parser, njs_parser_expression);
 
-            return njs_parser_after(parser, current, NULL, 0,
+            return njs_parser_after(parser, current, NULL, 1,
                                     njs_parser_for_expression);
         }
 
@@ -5645,13 +5645,11 @@ njs_parser_break_continue(njs_parser_t *parser, njs_lexer_token_t *token,
         return njs_parser_failed(parser);
 
     default:
-        if (!parser->strict_semicolon
-            && parser->lexer->prev_type == NJS_TOKEN_LINE_END)
-        {
-            break;
-        }
-
         if (njs_lexer_token_is_label_identifier(token)) {
+            if (parser->lexer->prev_type == NJS_TOKEN_LINE_END) {
+                return njs_parser_stack_pop(parser);
+            }
+
             if (njs_label_find(parser->vm, parser->scope,
                                token->unique_id) == NULL)
             {
@@ -7826,28 +7824,33 @@ njs_parser_template_string(njs_parser_t *parser, njs_lexer_token_t *token)
 
         c = *p++;
 
-        if (c == '\\') {
+        switch (c) {
+        case '\\':
             if (p == lexer->end) {
-                break;
+                return NJS_ERROR;
             }
 
             p++;
             escape = 1;
 
             continue;
-        }
 
-        if (c == '`') {
+        case '`':
             text->length = p - text->start - 1;
             goto done;
-        }
 
-        if (c == '$') {
+        case '$':
             if (p < lexer->end && *p == '{') {
                 p++;
                 text->length = p - text->start - 2;
                 goto done;
             }
+
+            break;
+
+        case '\n':
+            parser->lexer->line++;
+            break;
         }
     }
 
