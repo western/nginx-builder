@@ -571,8 +571,13 @@ njs_lookup_line(njs_vm_code_t *code, uint32_t offset)
     njs_uint_t         n;
     njs_vm_line_num_t  *map;
 
-    n = (code->lines != NULL) ? code->lines->items : 0;
-    map = (njs_vm_line_num_t *) code->lines->start;
+    n = 0;
+    map = NULL;
+
+    if (code->lines != NULL) {
+        n = code->lines->items;
+        map = (njs_vm_line_num_t *) code->lines->start;
+    }
 
     while (n != 0) {
         if (offset >= map->offset && (n == 1 || offset < map[1].offset)) {
@@ -3384,7 +3389,7 @@ njs_generate_global_reference(njs_vm_t *vm, njs_generator_t *generator,
     njs_vmcode_prop_get_t    *prop_get;
     const njs_lexer_entry_t  *lex_entry;
 
-    index = njs_generate_dest_index(vm, generator, node);
+    index = njs_generate_temp_index_get(vm, generator, node);
     if (njs_slow_path(index == NJS_INDEX_ERROR)) {
         return NJS_ERROR;
     }
