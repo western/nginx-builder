@@ -27,6 +27,7 @@ Table of Contents
 * [Debugging](#debugging)
 * [Automatic Error Logging](#automatic-error-logging)
 * [Limitations](#limitations)
+* [More Authentication Method Support](#more-authentication-method-support)
 * [Installation](#installation)
 * [Community](#community)
     * [English Mailing List](#english-mailing-list)
@@ -230,6 +231,15 @@ The following values are accepted: `big5`, `dec8`, `cp850`, `hp8`, `koi8r`, `lat
 * `pool`
 
     the name for the MySQL connection pool. if omitted, an ambiguous pool name will be generated automatically with the string template `user:database:host:port` or `user:database:path`. (this option was first introduced in `v0.08`.)
+
+* `pool_size`
+
+    Specifies the size of the connection pool. If omitted and no `backlog` option was provided, no pool will be created. If omitted but `backlog` was provided, the pool will be created with a default size equal to the value of the [lua_socket_pool_size](https://github.com/openresty/lua-nginx-module#lua_socket_pool_size) directive. The connection pool holds up to `pool_size` alive connections ready to be reused by subsequent calls to [connect](#connect), but note that there is no upper limit to the total number of opened connections outside of the pool. If you need to restrict the total number of opened connections, specify the `backlog` option. When the connection pool would exceed its size limit, the least recently used (kept-alive) connection already in the pool will be closed to make room for the current connection. Note that the cosocket connection pool is per Nginx worker process rather than per Nginx server instance, so the size limit specified here also applies to every single Nginx worker process. Also note that the size of the connection pool cannot be changed once it has been created. Note that at least [ngx_lua 0.10.14](https://github.com/openresty/lua-nginx-module/tags) is required to use this options.
+
+* `backlog`
+
+    If specified, this module will limit the total number of opened connections for this pool. No more connections than `pool_size` can be opened for this pool at any time. If the connection pool is full, subsequent connect operations will be queued into a queue equal to this option's value (the "backlog" queue). If the number of queued connect operations is equal to `backlog`, subsequent connect operations will fail and return nil plus the error string `"too many waiting connect operations"`. The queued connect operations will be resumed once the number of connections in the pool is less than `pool_size`. The queued connect operation will abort once they have been queued for more than `connect_timeout`, controlled by [set_timeout](#set_timeout), and will return nil plus the error string "timeout". Note that at least [ngx_lua 0.10.14](https://github.com/openresty/lua-nginx-module/tags) is required to use this options.
+
 * `compact_arrays`
 
     when this option is set to true, then the [query](#query) and [read_result](#read_result) methods will return the array-of-arrays structure for the resultset, rather than the default array-of-hashes structure.
@@ -483,6 +493,15 @@ each request.
 
 [Back to TOC](#table-of-contents)
 
+More Authentication Method Support
+=========
+
+By default, Of all authentication method, only [Old Password Authentication(mysql_old_password)](https://dev.mysql.com/doc/internals/en/old-password-authentication.html) and [Secure Password Authentication(mysql_native_password)](https://dev.mysql.com/doc/internals/en/secure-password-authentication.html) are suppored. If the server requires [sha256_password](https://dev.mysql.com/doc/internals/en/sha256.html) or cache_sha2_password, an error like `auth plugin caching_sha2_password or sha256_password are not supported because resty.rsa is not installed` may be returned.
+
+Need [lua-resty-rsa](https://github.com/spacewander/lua-resty-rsa) when using the `sha256_password` and `cache_sha2_password`.
+
+[Back to TOC](#table-of-contents)
+
 Installation
 ============
 
@@ -547,7 +566,6 @@ TODO
 
 * improve the MySQL connection pool support.
 * implement the MySQL binary row data packets.
-* implement MySQL's old pre-4.0 authentication method.
 * implement MySQL server prepare and execute packets.
 * implement the data compression support in the protocol.
 
