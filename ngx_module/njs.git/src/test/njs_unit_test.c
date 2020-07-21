@@ -10,9 +10,19 @@
 
 
 #define NJS_HAVE_LARGE_STACK (!NJS_HAVE_ADDRESS_SANITIZER && !NJS_HAVE_MEMORY_SANITIZER)
-#define _NJS_ARRAY(sz)       "Array(" njs_stringify(sz) ")"
-#define NJS_LARGE_ARRAY      _NJS_ARRAY(NJS_ARRAY_LARGE_OBJECT_LENGTH + 1)
-#define NJS_LARGE_ARRAY_LEN  "32769"
+
+#ifdef NJS_HAVE_LITTLE_ENDIAN
+#define njs_evar(little, big) (little)
+#else
+#define njs_evar(little, big) (big)
+#endif
+
+
+#define njs_declare_sparse_array(nm, sz)                                      \
+    "var " nm " = Array(" njs_stringify(sz) "); "                             \
+    "Object.defineProperty(" nm ", '0',"                                      \
+    "{writable:true, enumerable:false, configurable:true});"                  \
+    "delete " nm "[0];"
 
 
 typedef struct {
@@ -2553,6 +2563,9 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("var x = 0, y = 2; x\n--\ny; [x,y]"),
       njs_str("0,1") },
 
+    { njs_str("function f() {return\n}"),
+      njs_str("undefined") },
+
     /* if. */
 
     { njs_str("if (0);"),
@@ -3973,12 +3986,20 @@ static njs_unit_test_t  njs_test[] =
       njs_str(",,,false,true,0,1") },
 
     { njs_str("var o = { toString: function() { return null } };"
-                 "[o].join()"),
+              "[o].join()"),
       njs_str("null") },
 
     { njs_str("var o = { toString: function() { return undefined } };"
-                 "[o].join()"),
+              "[o].join()"),
       njs_str("undefined") },
+
+    { njs_str("var a = [0,,2,3];"
+              "Object.defineProperty(Array.prototype, 1, {get: ()=> {a[32] = 32; return 1}, configurable:true});"
+              "a.join()"),
+    njs_str("0,1,2,3") },
+
+    { njs_str("Array.prototype.join.call(new Uint8Array([0,1,2]))"),
+      njs_str("0,1,2") },
 
     { njs_str("var a = []; a[5] = 5; a"),
       njs_str(",,,,,5") },
@@ -4004,15 +4025,15 @@ static njs_unit_test_t  njs_test[] =
               "x.concat().hasOwnProperty('1') === true"),
       njs_str("true") },
 
-    { njs_str("var a = " NJS_LARGE_ARRAY ";"
+    { njs_str(njs_declare_sparse_array("a", 64)
               "a[32] = 1; a = a.concat([1]);"
               "njs.dump([a[0], a[32],a.length])"),
-      njs_str("[undefined,1,32770]") },
+      njs_str("[undefined,1,65]") },
 
-    { njs_str("var a = " NJS_LARGE_ARRAY ";"
+    { njs_str(njs_declare_sparse_array("a", 64)
               "a[32] = 1; a = [1].concat(a);"
               "njs.dump([a[0], a[33],a.length])"),
-      njs_str("[1,1,32770]") },
+      njs_str("[1,1,65]") },
 
     { njs_str("var re = /abc/; re[Symbol.isConcatSpreadable] = true;"
               "re[0] = 1, re[1] = 2, re[2] = 3, re.length = 3;"
@@ -4047,8 +4068,8 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("Array.prototype.toString.call('abc')"),
       njs_str("[object String]") },
 
-    { njs_str("var a = " NJS_LARGE_ARRAY "; var s = a.toString();"
-              "[s.length]"),
+    { njs_str(njs_declare_sparse_array("a", 32769)
+              "var s = a.toString(); [s.length]"),
       njs_str("32768") },
 
     /* Empty array elements. */
@@ -4320,9 +4341,10 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("var o = { length: 3 }; Array.prototype.pop.call(o); o.length"),
       njs_str("2") },
 
-    { njs_str("var a = " NJS_LARGE_ARRAY "; a[a.length - 1] = 'z'; a[a.length -2] = 'y';"
+    { njs_str(njs_declare_sparse_array("a", 16)
+              "a[a.length - 1] = 'z'; a[a.length -2] = 'y';"
               "Array.prototype.pop.call(a); [a.length, a[a.length - 1]]"),
-      njs_str("32768,y") },
+      njs_str("15,y") },
 
     { njs_str("[0,1].slice()"),
       njs_str("0,1") },
@@ -5400,17 +5422,22 @@ static njs_unit_test_t  njs_test[] =
     { njs_str(NJS_INT_TYPED_ARRAY_LIST
               ".map(v=>{var init = new Uint32Array([0xaabbccdd]);"
               "     try { return new v(init.buffer, 0, 2)} catch (e) {return e.name}})"),
-      njs_str("221,204,221,204,-35,-52,52445,43707,-13091,-21829,RangeError,RangeError") },
+      njs_str(njs_evar("221,204,221,204,-35,-52,52445,43707,-13091,-21829,RangeError,RangeError",
+                       "170,187,170,187,-86,-69,43707,52445,-21829,-13091,RangeError,RangeError")) },
 
     { njs_str(NJS_INT_TYPED_ARRAY_LIST
               ".map(v=>{var init = new Uint32Array([0xaabbccdd]);"
               "     try { return new v(init.buffer, 1, 2)} catch (e) {return e.name}})"),
-      njs_str("204,187,204,187,-52,-69,RangeError,RangeError,RangeError,RangeError") },
+      njs_str(njs_evar("204,187,204,187,-52,-69,RangeError,RangeError,RangeError,RangeError",
+                       "187,204,187,204,-69,-52,RangeError,RangeError,RangeError,RangeError")) },
 
     { njs_str(NJS_INT_TYPED_ARRAY_LIST
               ".map(v=>{var init = new Uint32Array([0xaabbccdd,0xdeadbeef]);"
               "     try { return new v(init.buffer, 0, 2)} catch (e) {return e.name}})"),
-      njs_str("221,204,221,204,-35,-52,52445,43707,-13091,-21829,2864434397,3735928559,-1430532899,-559038737") },
+      njs_str(njs_evar("221,204,221,204,-35,-52,52445,43707,-13091,-21829,"
+                       "2864434397,3735928559,-1430532899,-559038737",
+                       "170,187,170,187,-86,-69,43707,52445,-21829,-13091,"
+                       "2864434397,3735928559,-1430532899,-559038737")) },
 
     { njs_str(NJS_TYPED_ARRAY_LIST
               ".every(v=>{var buffer1 = new ArrayBuffer(8 * v.BYTES_PER_ELEMENT);"
@@ -5580,7 +5607,8 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("[1.0, -1234.0]"
               ".map(v=>{var a = new Float32Array(1); a[0] = v; var b = new Uint8Array(a.buffer);"
               "         return (b[0] << 24 | b[1] << 16| b[2] <<8 | b[3]).toString(16).padStart(8, '0');})"),
-      njs_str("0000803f,00409ac4") },
+      njs_str(njs_evar("0000803f,00409ac4",
+                       "3f800000,-3b65c000")) },
 
     { njs_str("var a = new ArrayBuffer(0); a.slice(0, 0).byteLength"),
       njs_str("0") },
@@ -5597,17 +5625,26 @@ static njs_unit_test_t  njs_test[] =
     { njs_str(NJS_TYPED_ARRAY_LIST
               ".map(v=>{var buffer = new ArrayBuffer(8); var view = new v(buffer);"
               "         view[0] = 511; return new Uint8Array(buffer.slice(0,4))})"),
-      njs_str("255,0,0,0,255,0,0,0,255,0,0,0,255,1,0,0,255,1,0,0,255,1,0,0,255,1,0,0,0,128,255,67,0,0,0,0") },
+      njs_str(njs_evar("255,0,0,0,255,0,0,0,255,0,0,0,255,1,0,0,255,1,"
+                       "0,0,255,1,0,0,255,1,0,0,0,128,255,67,0,0,0,0",
+                       "255,0,0,0,255,0,0,0,255,0,0,0,1,255,0,0,1,255,0,0,"
+                       "0,0,1,255,0,0,1,255,67,255,128,0,64,127,240,0")) },
 
     { njs_str(NJS_TYPED_ARRAY_LIST
               ".map(v=>{var buffer = new ArrayBuffer(8); var view = new v(buffer);"
               "         view[view.length - 1] = 511; return new Uint8Array(buffer.slice(4))})"),
-      njs_str("0,0,0,255,0,0,0,255,0,0,0,255,0,0,255,1,0,0,255,1,255,1,0,0,255,1,0,0,0,128,255,67,0,240,127,64") },
+      njs_str(njs_evar("0,0,0,255,0,0,0,255,0,0,0,255,0,0,255,1,0,0,255,1,"
+                       "255,1,0,0,255,1,0,0,0,128,255,67,0,240,127,64",
+                       "0,0,0,255,0,0,0,255,0,0,0,255,0,0,1,255,0,0,1,255,"
+                       "0,0,1,255,0,0,1,255,67,255,128,0,0,0,0,0")) },
 
     { njs_str(NJS_TYPED_ARRAY_LIST
               ".map(v=>{var buffer = new ArrayBuffer(8); var view = new v(buffer);"
               "         view[0] = 511; return new Uint8Array(buffer.slice(0,-4))})"),
-      njs_str("255,0,0,0,255,0,0,0,255,0,0,0,255,1,0,0,255,1,0,0,255,1,0,0,255,1,0,0,0,128,255,67,0,0,0,0") },
+      njs_str(njs_evar("255,0,0,0,255,0,0,0,255,0,0,0,255,1,0,0,255,1,0,0,"
+                       "255,1,0,0,255,1,0,0,0,128,255,67,0,0,0,0",
+                       "255,0,0,0,255,0,0,0,255,0,0,0,1,255,0,0,1,255,0,0,"
+                       "0,0,1,255,0,0,1,255,67,255,128,0,64,127,240,0")) },
 
     { njs_str("var a = new Uint8Array(10); var b = a.slice(1); b.length"),
       njs_str("9") },
@@ -5630,12 +5667,14 @@ static njs_unit_test_t  njs_test[] =
     { njs_str(NJS_INT_TYPED_ARRAY_LIST
               ".map(v=>{var init = new Uint8Array([1,2,3,4,5,6,7,8]); var view = new v(init.buffer);"
               "         return view.slice(0,2)})"),
-      njs_str("1,2,1,2,1,2,513,1027,513,1027,67305985,134678021,67305985,134678021") },
+      njs_str(njs_evar("1,2,1,2,1,2,513,1027,513,1027,67305985,134678021,67305985,134678021",
+                       "1,2,1,2,1,2,258,772,258,772,16909060,84281096,16909060,84281096")) },
 
     { njs_str(NJS_INT_TYPED_ARRAY_LIST
               ".map(v=>{var init = new Uint8Array([1,2,3,4,5,6,7,8]); var view = new v(init.buffer);"
               "         return view.slice(0,-2)})"),
-      njs_str("1,2,3,4,5,6,1,2,3,4,5,6,1,2,3,4,5,6,513,1027,513,1027,,") },
+      njs_str(njs_evar("1,2,3,4,5,6,1,2,3,4,5,6,1,2,3,4,5,6,513,1027,513,1027,,",
+                       "1,2,3,4,5,6,1,2,3,4,5,6,1,2,3,4,5,6,258,772,258,772,,")) },
 
     { njs_str("var other = new Uint8Array([0xff,0xff,0xff,0xff]);"
               NJS_TYPED_ARRAY_LIST
@@ -6168,13 +6207,13 @@ static njs_unit_test_t  njs_test[] =
               "Array.prototype.join.call(a)"),
       njs_str("1,5,8,23") },
 
-    { njs_str("var a = " NJS_LARGE_ARRAY "; "
+    { njs_str(njs_declare_sparse_array("a", 1024)
               "a[100] = 1; a[512] = -1; a[5] = undefined;"
               "a.sort();"
               "a[0] == -1 && a[1] == 1 && a[2] == undefined"),
       njs_str("true") },
 
-    { njs_str("var a = " NJS_LARGE_ARRAY "; "
+    { njs_str(njs_declare_sparse_array("a", 1024)
               "a.fill(1, 256, 512); a.fill(undefined, 1000, 1010);"
               "Object.defineProperty(a, '256', {value: a[256], enumerable:false});"
               "a.sort();"
@@ -6690,6 +6729,13 @@ static njs_unit_test_t  njs_test[] =
               "[f.name, f.bind().name]"),
       njs_str("F,bound F") },
 
+    { njs_str("var s = Symbol('F'); var f = Object.defineProperty(function() {}, 'name', {get:()=>s});"
+              "[f.name.description, f.bind().name]"),
+      njs_str("F,bound ") },
+
+    { njs_str("/a/[Symbol.replace].bind().name"),
+      njs_str("bound [Symbol.replace]") },
+
     { njs_str("var f = Object.defineProperty(function() {}, 'name', {get:()=>{throw Error('Oops')}});"
               "f.bind().name"),
       njs_str("Error: Oops") },
@@ -7094,8 +7140,35 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("String.fromCharCode(65.14 + 65536)"),
       njs_str("A") },
 
+    { njs_str("String.fromCharCode(0xD83D, 0xDCA9)"),
+      njs_str("💩") },
+
+    { njs_str("String.fromCharCode(0xD83D, 0xDCA9).length"),
+      njs_str("1") },
+
+    { njs_str("String.fromCharCode(0xD83D)"),
+      njs_str("�") },
+
+    { njs_str("String.fromCharCode(0xD83D).length"),
+      njs_str("1") },
+
+    { njs_str("String.fromCharCode(0xD83D) + String.fromCharCode(0xDCA9)"),
+      njs_str("��") },
+
     { njs_str("String.fromCodePoint(65 + 65536)"),
       njs_str("𐁁") },
+
+    { njs_str("String.fromCodePoint(0xD83D, 0xDCA9)"),
+      njs_str("💩") },
+
+    { njs_str("String.fromCodePoint(0xD83D, 0xDCA9).length"),
+      njs_str("1") },
+
+    { njs_str("String.fromCodePoint(0xD83D)"),
+      njs_str("�") },
+
+    { njs_str("String.fromCodePoint(0xD83D).length"),
+      njs_str("1") },
 
     { njs_str("String.fromCharCode(2**53 + 10)"),
       njs_str("\n") },
@@ -7112,7 +7185,10 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("(function() {"
                  "    var n;"
                  "    for (n = 0; n <= 65536; n++) {"
-                 "        if (String.fromCharCode(n).charCodeAt(0) !== n)"
+
+                 /* From U+D800 to U+DFFF is surrogate pair. Not valid in UTF-8. */
+
+                 "        if ((n < 0xD800 || n > 0xDFFF) && String.fromCharCode(n).charCodeAt(0) !== n)"
                  "            return n;"
                  "    }"
                  "    return -1"
@@ -7123,7 +7199,7 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("(function() {"
                  "    var n;"
                  "    for (n = 0; n <= 1114111; n++) {"
-                 "        if (String.fromCodePoint(n).codePointAt(0) !== n)"
+                 "        if ((n < 0xD800 || n > 0xDFFF) && String.fromCodePoint(n).codePointAt(0) !== n)"
                  "            return n;"
                  "    }"
                  "    return -1"
@@ -7541,6 +7617,9 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("'abc'.replace(/f/, 'X')"),
       njs_str("abc") },
 
+    { njs_str("'AB=C==='.replace(/=*$/, '')"),
+      njs_str("AB=C") },
+
     { njs_str("('a'.repeat(33) + 'bb').replace(/bb/, 'CC').slice(31)"),
       njs_str("aaCC") },
 
@@ -7728,6 +7807,9 @@ static njs_unit_test_t  njs_test[] =
               "'ABC'.replace(/(B)/, '$<g>')"),
       njs_str("OOps") },
 
+    { njs_str("var name = /a/g[Symbol.replace].name; [name, typeof name]"),
+      njs_str("[Symbol.replace],string") },
+
     { njs_str("RegExp.prototype[Symbol.replace].call()"),
       njs_str("TypeError: \"this\" is not object") },
 
@@ -7739,6 +7821,9 @@ static njs_unit_test_t  njs_test[] =
 
     { njs_str("/]/"),
       njs_str("/\\]/") },
+
+    { njs_str("/=/"),
+      njs_str("/=/") },
 
     { njs_str("/["),
       njs_str("SyntaxError: Unterminated RegExp \"/[\" in 1") },
@@ -8219,16 +8304,8 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("encodeURI('012абв')"),
       njs_str("012%D0%B0%D0%B1%D0%B2")},
 
-    { njs_str("["
-              " String.fromCharCode(0xD800),"
-              " String.fromCharCode(0xD800) + 'a',"
-              " String.fromCharCode(0xDC00),"
-              " String.fromCharCode(0xDC00) + 'a',"
-              "].every(v=>{try { encodeURI(v)} catch(e) {return e.name == 'URIError'}})"),
-      njs_str("true")},
-
     { njs_str("encodeURI(String.fromCharCode(0xD800)+String.fromCharCode(0xDC00))"),
-      njs_str("%F0%90%80%80")},
+      njs_str("%EF%BF%BD%EF%BF%BD")},
 
     { njs_str("encodeURI('~}|{`_^]\\\\[@?>=<;:/.-,+*)(\\\'&%$#\"! ')"),
       njs_str("~%7D%7C%7B%60_%5E%5D%5C%5B@?%3E=%3C;:/.-,+*)('&%25$#%22!%20")},
@@ -10913,9 +10990,6 @@ static njs_unit_test_t  njs_test[] =
 
     { njs_str("var a = Array(Infinity)"),
       njs_str("RangeError: Invalid array length") },
-
-    { njs_str(NJS_LARGE_ARRAY ".length"),
-      njs_str(NJS_LARGE_ARRAY_LEN) },
 
     { njs_str("var a = Array(1111111111); a[1111111112] = 1; a.length"),
       njs_str("1111111113") },
@@ -15832,13 +15906,13 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("var a = [1]; a[2] = 'x'; JSON.stringify(a)"),
       njs_str("[1,null,\"x\"]") },
 
-    { njs_str("var a = " NJS_LARGE_ARRAY ";"
+    { njs_str(njs_declare_sparse_array("a", 32769)
               "a[32] = 'a'; a[64] = 'b';"
               "var s = JSON.stringify(a); "
               "[s.length,s.substring(162,163),s.match(/null/g).length]"),
       njs_str("163844,a,32767") },
 
-    { njs_str("var a = " NJS_LARGE_ARRAY ";"
+    { njs_str(njs_declare_sparse_array("a", 8)
               "a[2] = 'a'; a[4] = 'b'; a.length = 3;"
               "JSON.stringify(a)"),
       njs_str("[null,null,\"a\"]") },

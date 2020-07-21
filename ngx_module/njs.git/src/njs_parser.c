@@ -1115,6 +1115,7 @@ njs_parser_primary_expression_test(njs_parser_t *parser,
 
     /* RegularExpressionLiteral */
     case NJS_TOKEN_DIVISION:
+    case NJS_TOKEN_DIVISION_ASSIGNMENT:
         node = njs_parser_node_new(parser, NJS_TOKEN_REGEXP);
         if (node == NULL) {
             return NJS_ERROR;
@@ -1200,6 +1201,10 @@ njs_parser_regexp_literal(njs_parser_t *parser, njs_lexer_token_t *token,
 
     value = &parser->node->u.value;
     lexer = parser->lexer;
+
+    if (token->type == NJS_TOKEN_DIVISION_ASSIGNMENT) {
+        lexer->start--;
+    }
 
     for (p = lexer->start; p < lexer->end; p++) {
 
@@ -3135,7 +3140,7 @@ njs_parser_left_hand_side_expression_optional(njs_parser_t *parser,
 
 static njs_int_t
 njs_parser_expression_node(njs_parser_t *parser, njs_lexer_token_t *token,
-	njs_queue_link_t *current, njs_token_type_t type,
+    njs_queue_link_t *current, njs_token_type_t type,
     njs_vmcode_operation_t operation, njs_parser_state_func_t after)
 {
     njs_parser_node_t  *node;
@@ -5719,6 +5724,7 @@ njs_parser_return_statement(njs_parser_t *parser, njs_lexer_token_t *token,
 
     switch (token->type) {
     case NJS_TOKEN_SEMICOLON:
+        njs_lexer_consume_token(parser->lexer, 1);
         break;
 
     case NJS_TOKEN_LINE_END:
@@ -5740,8 +5746,6 @@ njs_parser_return_statement(njs_parser_t *parser, njs_lexer_token_t *token,
     }
 
     parser->node = node;
-
-    njs_lexer_consume_token(parser->lexer, 1);
 
     return njs_parser_stack_pop(parser);
 }
@@ -7892,11 +7896,12 @@ njs_int_t
 njs_parser_string_create(njs_vm_t *vm, njs_lexer_token_t *token,
     njs_value_t *value)
 {
-    u_char        *dst;
-    ssize_t       size, length;
-    uint32_t      cp;
-    njs_str_t     *src;
-    const u_char  *p, *end;
+    u_char                *dst;
+    ssize_t               size, length;
+    uint32_t              cp;
+    njs_str_t             *src;
+    const u_char          *p, *end;
+    njs_unicode_decode_t  ctx;
 
     src = &token->text;
 
@@ -7910,10 +7915,17 @@ njs_parser_string_create(njs_vm_t *vm, njs_lexer_token_t *token,
     p = src->start;
     end = src->start + src->length;
 
-    while (p < end) {
-        cp = njs_utf8_safe_decode(&p, end);
+    njs_utf8_decode_init(&ctx);
 
-        dst = njs_utf8_encode(dst, cp);
+    while (p < end) {
+        cp = njs_utf8_decode(&ctx, &p, end);
+
+        if (cp <= NJS_UNICODE_MAX_CODEPOINT) {
+            dst = njs_utf8_encode(dst, cp);
+
+        } else {
+            dst = njs_utf8_encode(dst, NJS_UNICODE_REPLACEMENT);
+        }
     }
 
     if (length > NJS_STRING_MAP_STRIDE && size != length) {
@@ -7928,12 +7940,13 @@ static njs_token_type_t
 njs_parser_escape_string_create(njs_parser_t *parser, njs_lexer_token_t *token,
     njs_value_t *value)
 {
-    u_char        c, *start, *dst;
-    size_t        size, length, hex_length;
-    uint64_t      cp, cp_pair;
-    njs_int_t     ret;
-    njs_str_t     *string;
-    const u_char  *src, *end, *hex_end;
+    u_char                c, *start, *dst;
+    size_t                size, length, hex_length;
+    uint64_t              cp, cp_pair;
+    njs_int_t             ret;
+    njs_str_t             *string;
+    const u_char          *src, *end, *hex_end;
+    njs_unicode_decode_t  ctx;
 
     ret = njs_parser_escape_string_calc_length(parser, token, &size, &length);
     if (njs_slow_path(ret != NJS_OK)) {
@@ -8049,7 +8062,13 @@ njs_parser_escape_string_create(njs_parser_t *parser, njs_lexer_token_t *token,
 
         src--;
 
-        cp = njs_utf8_safe_decode2(&src, end);
+        njs_utf8_decode_init(&ctx);
+
+        cp = njs_utf8_decode(&ctx, &src, end);
+        if (cp > NJS_UNICODE_MAX_CODEPOINT) {
+            cp = NJS_UNICODE_REPLACEMENT;
+        }
+
         dst = njs_utf8_encode(dst, cp);
 
         continue;
@@ -8072,12 +8091,12 @@ njs_parser_escape_string_create(njs_parser_t *parser, njs_lexer_token_t *token,
                 cp = njs_string_surrogate_pair(cp_pair, cp);
 
             } else if (njs_slow_path(njs_surrogate_leading(cp))) {
-                cp = NJS_UTF8_REPLACEMENT;
+                cp = NJS_UNICODE_REPLACEMENT;
 
                 dst = njs_utf8_encode(dst, (uint32_t) cp);
 
             } else {
-                dst = njs_utf8_encode(dst, NJS_UTF8_REPLACEMENT);
+                dst = njs_utf8_encode(dst, NJS_UNICODE_REPLACEMENT);
             }
 
             cp_pair = 0;
@@ -8088,7 +8107,7 @@ njs_parser_escape_string_create(njs_parser_t *parser, njs_lexer_token_t *token,
                 continue;
             }
 
-            cp = NJS_UTF8_REPLACEMENT;
+            cp = NJS_UNICODE_REPLACEMENT;
         }
 
         dst = njs_utf8_encode(dst, (uint32_t) cp);
@@ -8112,10 +8131,11 @@ static njs_int_t
 njs_parser_escape_string_calc_length(njs_parser_t *parser,
     njs_lexer_token_t *token, size_t *out_size, size_t *out_length)
 {
-    size_t        size, length, hex_length;
-    uint64_t      cp, cp_pair;
-    njs_str_t     *string;
-    const u_char  *ptr, *src, *end, *hex_end;
+    size_t                size, length, hex_length;
+    uint64_t              cp, cp_pair;
+    njs_str_t             *string;
+    const u_char          *ptr, *src, *end, *hex_end;
+    njs_unicode_decode_t  ctx;
 
     size = 0;
     length = 0;
@@ -8169,7 +8189,12 @@ njs_parser_escape_string_calc_length(njs_parser_t *parser,
         }
 
         if (*src >= 0x80) {
-            cp = njs_utf8_safe_decode2(&src, end);
+            njs_utf8_decode_init(&ctx);
+
+            cp = njs_utf8_decode(&ctx, &src, end);
+            if (cp > NJS_UNICODE_MAX_CODEPOINT) {
+                cp = NJS_UNICODE_REPLACEMENT;
+            }
 
             size += njs_utf8_size(cp);
             length++;
@@ -8216,13 +8241,13 @@ njs_parser_escape_string_calc_length(njs_parser_t *parser,
                 cp = njs_string_surrogate_pair(cp_pair, cp);
 
             } else if (njs_slow_path(njs_surrogate_leading(cp))) {
-                cp = NJS_UTF8_REPLACEMENT;
+                cp = NJS_UNICODE_REPLACEMENT;
 
                 size += njs_utf8_size(cp);
                 length++;
 
             } else {
-                size += njs_utf8_size(NJS_UTF8_REPLACEMENT);
+                size += njs_utf8_size(NJS_UNICODE_REPLACEMENT);
                 length++;
             }
 
@@ -8234,7 +8259,7 @@ njs_parser_escape_string_calc_length(njs_parser_t *parser,
                 continue;
             }
 
-            cp = NJS_UTF8_REPLACEMENT;
+            cp = NJS_UNICODE_REPLACEMENT;
         }
 
         size += njs_utf8_size(cp);
