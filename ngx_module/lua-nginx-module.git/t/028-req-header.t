@@ -2033,7 +2033,7 @@ new
 
 
 
-=== TEST 62: set input header with unsafe key
+=== TEST 62: unsafe header name (with '\r')
 --- config
     location /req-header {
         rewrite_by_lua_block {
@@ -2044,14 +2044,14 @@ new
     }
 --- request
 GET /req-header
---- error_code: 500
---- error_log
-unsafe byte "0xd" in header "Foo\x0Dfoo"
-failed to set header
+--- response_body
+Foo: 
+--- no_error_log
+[error]
 
 
 
-=== TEST 63: set input header with unsafe value
+=== TEST 63: unsafe header value (with '\n')
 --- config
     location /req-header {
         rewrite_by_lua_block {
@@ -2062,14 +2062,14 @@ failed to set header
     }
 --- request
 GET /req-header
---- error_code: 500
---- error_log
-unsafe byte "0xa" in header "new\x0Avalue"
-failed to set header
+--- response_body
+Foo: new%0Avalue
+--- no_error_log
+[error]
 
 
 
-=== TEST 64: set input header with multiple unsafe values
+=== TEST 64: multiple unsafe header values (with '\n' and '\t')
 --- config
     location /req-header {
         rewrite_by_lua_block {
@@ -2082,14 +2082,14 @@ failed to set header
     }
 --- request
 GET /req-header
---- error_code: 500
---- error_log
-unsafe byte "0xa" in header "new\x0Avalue"
-failed to set header
+--- response_body
+new%0Avalue, foo	bar.
+--- no_error_log
+[error]
 
 
 
-=== TEST 65: unsafe value errors escape '"' and '\' characters
+=== TEST 65: unsafe names/values logging escapes '"' and '\' characters
 --- config
     location /req-header {
         rewrite_by_lua_block {
@@ -2097,12 +2097,69 @@ failed to set header
         }
 
         content_by_lua_block {
-            ngx.say(table.concat(ngx.req.get_headers()["foo"], ", "), ".")
+            ngx.say(ngx.req.get_headers()["foo"])
         }
     }
 --- request
 GET /req-header
---- error_code: 500
---- error_log
-unsafe byte "0xa" in header "\x22new\x0Avalue\x5C\x22"
-failed to set header
+--- response_body
+"new%0Avalue\"
+--- no_error_log
+[error]
+
+
+
+=== TEST 66: add request headers with '\r\n'
+--- config
+    location /bar {
+        access_by_lua_block {
+            ngx.req.set_header("Foo\r", "123\r\n")
+        }
+        proxy_pass http://127.0.0.1:$server_port/foo;
+    }
+
+    location = /foo {
+        echo $echo_client_request_headers;
+    }
+--- request
+GET /bar
+--- response_body_like chomp
+\bFoo%0D: 123%0D%0A\b
+
+
+
+=== TEST 67: add request headers with '\0'
+--- config
+    location /bar {
+        access_by_lua_block {
+            ngx.req.set_header("Foo", "\0")
+        }
+        proxy_pass http://127.0.0.1:$server_port/foo;
+    }
+
+    location = /foo {
+        echo $echo_client_request_headers;
+    }
+--- request
+GET /bar
+--- response_body_like chomp
+\bFoo: %00\b
+
+
+
+=== TEST 68: add request headers with '中文'
+--- config
+    location /bar {
+        access_by_lua_block {
+            ngx.req.set_header("Foo中文", "ab中文a")
+        }
+        proxy_pass http://127.0.0.1:$server_port/foo;
+    }
+
+    location = /foo {
+        echo $echo_client_request_headers;
+    }
+--- request
+GET /bar
+--- response_body_like chomp
+\bFoo%E4%B8%AD%E6%96%87: ab中文a\r\n

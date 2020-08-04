@@ -1,4 +1,3 @@
-sudo: required
 dist: xenial
 
 os: linux
@@ -34,7 +33,7 @@ env:
     - LUAJIT_LIB=$LUAJIT_PREFIX/lib
     - LUAJIT_INC=$LUAJIT_PREFIX/include/luajit-2.1
     - LUA_INCLUDE_DIR=$LUAJIT_INC
-    - PCRE_VER=8.41
+    - PCRE_VER=8.44
     - PCRE_PREFIX=/opt/pcre
     - PCRE_LIB=$PCRE_PREFIX/lib
     - PCRE_INC=$PCRE_PREFIX/include
@@ -47,14 +46,14 @@ env:
     - LD_LIBRARY_PATH=$LUAJIT_LIB:$LD_LIBRARY_PATH
     - DRIZZLE_VER=2011.07.21
     - TEST_NGINX_SLEEP=0.006
-  matrix:
+  jobs:
     - NGINX_VERSION=1.17.8 OPENSSL_VER=1.0.2u OPENSSL_PATCH_VER=1.0.2h
     - NGINX_VERSION=1.17.8 OPENSSL_VER=1.1.0l OPENSSL_PATCH_VER=1.1.0d
-    - NGINX_VERSION=1.17.8 OPENSSL_VER=1.1.1e OPENSSL_PATCH_VER=1.1.1e
+    - NGINX_VERSION=1.17.8 OPENSSL_VER=1.1.1g OPENSSL_PATCH_VER=1.1.1f
 
 services:
- - memcache
- - redis-server
+ - memcached
+ - redis
  - mysql
 
 before_install:
@@ -64,8 +63,8 @@ before_install:
 
 install:
   - if [ ! -f download-cache/drizzle7-$DRIZZLE_VER.tar.gz ]; then wget -P download-cache http://openresty.org/download/drizzle7-$DRIZZLE_VER.tar.gz; fi
-  - if [ ! -f download-cache/pcre-$PCRE_VER.tar.gz ]; then wget -P download-cache http://ftp.cs.stanford.edu/pub/exim/pcre/pcre-$PCRE_VER.tar.gz; fi
-  - if [ ! -f download-cache/openssl-$OPENSSL_VER.tar.gz ]; then wget -P download-cache https://www.openssl.org/source/openssl-$OPENSSL_VER.tar.gz; fi
+  - if [ ! -f download-cache/pcre-$PCRE_VER.tar.gz ]; then wget -P download-cache https://ftp.pcre.org/pub/pcre/pcre-$PCRE_VER.tar.gz; fi
+  - if [ ! -f download-cache/openssl-$OPENSSL_VER.tar.gz ]; then wget -P download-cache https://www.openssl.org/source/openssl-$OPENSSL_VER.tar.gz || wget -P download-cache https://www.openssl.org/source/old/${OPENSSL_VER//[a-z]/}/openssl-$OPENSSL_VER.tar.gz; fi
   - git clone https://github.com/openresty/test-nginx.git
   - git clone https://github.com/openresty/openresty.git ../openresty
   - git clone https://github.com/openresty/no-pool-nginx.git ../no-pool-nginx
@@ -95,8 +94,8 @@ before_script:
 
 script:
   - sudo iptables -I OUTPUT 1 -p udp --dport 10086 -j REJECT
-  - sudo iptables -A OUTPUT -p tcp --dst 127.0.0.2 --dport 12345 -j DROP
-  - sudo iptables -A OUTPUT -p udp --dst 127.0.0.2 --dport 12345 -j DROP
+  - sudo iptables -I OUTPUT -p tcp --dst 127.0.0.2 --dport 12345 -j DROP
+  - sudo iptables -I OUTPUT -p udp --dst 127.0.0.2 --dport 12345 -j DROP
   - cd luajit2/
   - make -j$JOBS CCDEBUG=-g Q= PREFIX=$LUAJIT_PREFIX CC=$CC XCFLAGS='-DLUA_USE_APICHECK -DLUA_USE_ASSERT -msse4.2' > build.log 2>&1 || (cat build.log && exit 1)
   - sudo make install PREFIX=$LUAJIT_PREFIX > build.log 2>&1 || (cat build.log && exit 1)

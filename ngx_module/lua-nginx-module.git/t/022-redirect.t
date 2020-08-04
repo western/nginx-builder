@@ -9,7 +9,7 @@ use Test::Nginx::Socket::Lua;
 repeat_each(2);
 #repeat_each(1);
 
-plan tests => repeat_each() * (blocks() * 3 + 14);
+plan tests => repeat_each() * (blocks() * 3 + 9);
 
 #no_diff();
 #no_long_string();
@@ -323,7 +323,7 @@ Location: http://agentzh.org/foo?a=b&c=d
 
 
 
-=== TEST 18: uri contains '\r'
+=== TEST 18: unsafe uri (with '\r')
 --- config
     location = /t {
         content_by_lua_block {
@@ -339,12 +339,11 @@ Location:
 foo:
 bar:
 --- error_log
-unsafe byte "0xd" in header "http://agentzh.org/foo\x0Dfoo:bar\x0Abar:foo"
-attempt to use unsafe uri
+unsafe byte "0x0d" in redirect uri "http://agentzh.org/foo\x0Dfoo:bar\x0Abar:foo"
 
 
 
-=== TEST 19: uri contains '\n'
+=== TEST 19: unsafe uri (with '\n')
 --- config
     location = /t {
         content_by_lua_block {
@@ -360,12 +359,11 @@ Location:
 foo:
 bar:
 --- error_log
-unsafe byte "0xa" in header "http://agentzh.org/foo\x0Afoo:bar\x0Dbar:foo"
-attempt to use unsafe uri
+unsafe byte "0x0a" in redirect uri "http://agentzh.org/foo\x0Afoo:bar\x0Dbar:foo"
 
 
 
-=== TEST 20: uri prefix '\n'
+=== TEST 20: unsafe uri (with prefix '\n')
 --- config
     location = /t {
         content_by_lua_block {
@@ -380,12 +378,11 @@ GET /t
 Location:
 foo:
 --- error_log
-unsafe byte "0xa" in header "\x0Afoo:http://agentzh.org/foo"
-attempt to use unsafe uri
+unsafe byte "0x0a" in redirect uri "\x0Afoo:http://agentzh.org/foo"
 
 
 
-=== TEST 21: uri prefix '\r'
+=== TEST 21: unsafe uri (with prefix '\r')
 --- config
     location = /t {
         content_by_lua_block {
@@ -400,12 +397,11 @@ GET /t
 Location:
 foo:
 --- error_log
-unsafe byte "0xd" in header "\x0Dfoo:http://agentzh.org/foo"
-attempt to use unsafe uri
+unsafe byte "0x0d" in redirect uri "\x0Dfoo:http://agentzh.org/foo"
 
 
 
-=== TEST 22: uri with invalid characters escapes '"' and '\' characters
+=== TEST 22: unsafe uri logging escapes '"' and '\' characters
 --- config
     location = /t {
         content_by_lua_block {
@@ -420,5 +416,4 @@ GET /t
 Location:
 foo:
 --- error_log
-unsafe byte "0xd" in header "\x0Dhttp\x5C://\x22agentzh.org\x22/foo"
-attempt to use unsafe uri
+unsafe byte "0x0d" in redirect uri "\x0Dhttp\x5C://\x22agentzh.org\x22/foo"

@@ -8,7 +8,7 @@ use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 3 + 80);
+plan tests => repeat_each() * (blocks() * 3 + 77);
 
 #no_diff();
 no_long_string();
@@ -51,7 +51,7 @@ Content-Type: text/html
 
 
 
-=== TEST 3: set response content-type header
+=== TEST 3: set response content-length header
 --- config
     location /read {
         content_by_lua '
@@ -1966,7 +1966,7 @@ Content-Type: application/json
 
 
 
-=== TEST 87: value contains '\r'
+=== TEST 87: unsafe header value (with '\r')
 --- config
     location = /t {
         content_by_lua_block {
@@ -1976,18 +1976,16 @@ Content-Type: application/json
     }
 --- request
 GET /t
---- error_code: 500
 --- response_headers
-header:
+header: value%0Dfoo:bar%0Abar:foo
 foo:
 bar:
---- error_log
-unsafe byte "0xd" in header "value\x0Dfoo:bar\x0Abar:foo"
-failed to set header
+--- no_error_log
+[error]
 
 
 
-=== TEST 88: value contains '\n'
+=== TEST 88: unsafe header value (with '\n')
 --- config
     location = /t {
         content_by_lua_block {
@@ -1997,18 +1995,16 @@ failed to set header
     }
 --- request
 GET /t
---- error_code: 500
 --- response_headers
-header:
+header: value%0Afoo:bar%0Dbar:foo
 foo:
 bar:
---- error_log
-unsafe byte "0xa" in header "value\x0Afoo:bar\x0Dbar:foo"
-failed to set header
+--- no_error_log
+[error]
 
 
 
-=== TEST 89: header name contains '\r'
+=== TEST 89: unsafe header name (with '\r')
 --- config
     location = /t {
         content_by_lua_block {
@@ -2018,18 +2014,17 @@ failed to set header
     }
 --- request
 GET /t
---- error_code: 500
 --- response_headers
+header%3A%20value%0Dfoo%3Abar%0Abar%3Afoo: xx
 header:
 foo:
 bar:
---- error_log
-unsafe byte "0xd" in header "header: value\x0Dfoo:bar\x0Abar:foo"
-failed to set header
+--- no_error_log
+[error]
 
 
 
-=== TEST 90: truncates key after '\n'
+=== TEST 90: unsafe header name (with '\n')
 --- config
     location = /t {
         content_by_lua_block {
@@ -2039,18 +2034,17 @@ failed to set header
     }
 --- request
 GET /t
---- error_code: 500
 --- response_headers
+header%3A%20value%0Afoo%3Abar%0Dbar%3Afoo: xx
 header:
 foo:
 bar:
---- error_log
-unsafe byte "0xa" in header "header: value\x0Afoo:bar\x0Dbar:foo"
-failed to set header
+--- no_error_log
+[error]
 
 
 
-=== TEST 91: header name: '\r' as the first character
+=== TEST 91: unsafe header name (with prefix '\r')
 --- config
     location = /t {
         content_by_lua_block {
@@ -2060,18 +2054,17 @@ failed to set header
     }
 --- request
 GET /t
---- error_code: 500
 --- response_headers
+%0Dheader%3A%20value%0Dfoo%3Abar%0Abar%3Afoo: xx
 header:
 foo:
 bar:
---- error_log
-unsafe byte "0xd" in header "\x0Dheader: value\x0Dfoo:bar\x0Abar:foo"
-failed to set header
+--- no_error_log
+[error]
 
 
 
-=== TEST 92: header name: '\n' as the first character
+=== TEST 92: unsafe header name (with prefix '\n')
 --- config
     location = /t {
         content_by_lua_block {
@@ -2081,18 +2074,17 @@ failed to set header
     }
 --- request
 GET /t
---- error_code: 500
 --- response_headers
+%0Aheader%3A%20value%0Afoo%3Abar%0Dbar%3Afoo: xx
 header:
 foo:
 bar:
---- error_log
-unsafe byte "0xa" in header "\x0Aheader: value\x0Afoo:bar\x0Dbar:foo"
-failed to set header
+--- no_error_log
+[error]
 
 
 
-=== TEST 93: truncates multiple values if they contain '\r' or '\n'
+=== TEST 93: multiple unsafe header values (with '\n' and '\r')
 --- config
     location = /t {
         content_by_lua_block {
@@ -2105,11 +2097,10 @@ failed to set header
     }
 --- request
 GET /t
---- error_code: 500
 --- response_headers
-foo:
 xx:
 xxx:
---- error_log
-unsafe byte "0xa" in header "foo\x0Axx:bar"
-failed to set header
+--- raw_response_headers_like chomp
+foo: foo%0Axx:bar\r\nfoo: bar%0Dxxx:foo\r\n
+--- no_error_log
+[error]

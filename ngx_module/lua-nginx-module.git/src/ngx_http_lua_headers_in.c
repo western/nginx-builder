@@ -653,14 +653,18 @@ ngx_http_lua_set_input_header(ngx_http_request_t *r, ngx_str_t key,
 {
     ngx_http_lua_header_val_t         hv;
     ngx_http_lua_set_header_t        *handlers = ngx_http_lua_set_handlers;
-
+    ngx_int_t                         rc;
     ngx_uint_t                        i;
 
     dd("set header value: %.*s", (int) value.len, value.data);
 
-    if (ngx_http_lua_check_header_safe(r, key.data, key.len) != NGX_OK
-        || ngx_http_lua_check_header_safe(r, value.data, value.len) != NGX_OK)
-    {
+    rc = ngx_http_lua_copy_escaped_header(r, &key, 1);
+    if (rc != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    rc = ngx_http_lua_copy_escaped_header(r, &value, 0);
+    if (rc != NGX_OK) {
         return NGX_ERROR;
     }
 

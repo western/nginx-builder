@@ -27,6 +27,9 @@
 #   define NGX_HTTP_SWITCHING_PROTOCOLS 101
 #endif
 
+#define NGX_HTTP_LUA_ESCAPE_HEADER_NAME  7
+
+#define NGX_HTTP_LUA_ESCAPE_HEADER_VALUE  8
 
 /* key in Lua vm registry for all the "ngx.ctx" tables */
 #define ngx_http_lua_ctx_tables_key  "ngx_lua_ctx_tables"
@@ -169,6 +172,9 @@ void ngx_http_lua_unescape_uri(u_char **dst, u_char **src, size_t size,
 uintptr_t ngx_http_lua_escape_uri(u_char *dst, u_char *src,
     size_t size, ngx_uint_t type);
 
+ngx_int_t ngx_http_lua_copy_escaped_header(ngx_http_request_t *r,
+    ngx_str_t *dst, int is_name);
+
 void ngx_http_lua_inject_req_api(ngx_log_t *log, lua_State *L);
 
 void ngx_http_lua_process_args_option(ngx_http_request_t *r,
@@ -242,8 +248,6 @@ void ngx_http_lua_set_sa_restart(ngx_log_t *log);
 #endif
 
 size_t ngx_http_lua_escape_log(u_char *dst, u_char *src, size_t size);
-ngx_int_t ngx_http_lua_check_header_safe(ngx_http_request_t *r, u_char *str,
-    size_t len);
 
 
 static ngx_inline void
@@ -489,6 +493,45 @@ ngx_inet_get_port(struct sockaddr *sa)
     }
 }
 #endif
+
+
+static ngx_inline ngx_int_t
+ngx_http_lua_check_unsafe_uri_bytes(ngx_http_request_t *r, u_char *str,
+    size_t len, u_char *byte)
+{
+    size_t           i;
+    u_char           c;
+
+                     /* %00-%08, %0A-%1F, %7F */
+
+    static uint32_t  unsafe[] = {
+        0xfffffdff, /* 1111 1111 1111 1111  1111 1101 1111 1111 */
+
+                    /* ?>=< ;:98 7654 3210  /.-, +*)( '&%$ #"!  */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+
+                    /* _^]\ [ZYX WVUT SRQP  ONML KJIH GFED CBA@ */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+
+                    /*  ~}| {zyx wvut srqp  onml kjih gfed cba` */
+        0x80000000, /* 1000 0000 0000 0000  0000 0000 0000 0000 */
+
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+        0x00000000, /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+        0x00000000  /* 0000 0000 0000 0000  0000 0000 0000 0000 */
+    };
+
+    for (i = 0; i < len; i++, str++) {
+        c = *str;
+        if (unsafe[c >> 5] & (1 << (c & 0x1f))) {
+            *byte = c;
+            return NGX_ERROR;
+        }
+    }
+
+    return NGX_OK;
+}
 
 
 extern ngx_uint_t  ngx_http_lua_location_hash;
