@@ -1,0 +1,143 @@
+----------------------------------------
+checking for C compiler: cc
+gcc version 7.5.0 (SUSE Linux) 
+----------------------------------------
+checking for sizeof(int)
+4
+----------------------------------------
+checking for sizeof(u_int)
+4
+----------------------------------------
+checking for sizeof(void *)
+8
+----------------------------------------
+checking for sizeof(uintptr_t)
+8
+----------------------------------------
+checking for sizeof(size_t)
+8
+----------------------------------------
+checking for sizeof(off_t)
+8
+----------------------------------------
+checking for sizeof(time_t)
+8
+----------------------------------------
+checking for system byte ordering
+little
+
+----------------------------------------
+checking for GCC unsigned __int128
+----------------------------------------
+checking for GCC __builtin_expect()
+----------------------------------------
+checking for GCC __builtin_unreachable()
+----------------------------------------
+checking for GCC __builtin_prefetch()
+----------------------------------------
+checking for GCC __builtin_clz()
+----------------------------------------
+checking for GCC __builtin_clzll()
+----------------------------------------
+checking for GCC __attribute__ visibility
+----------------------------------------
+checking for GCC __attribute__ malloc
+----------------------------------------
+checking for GCC __attribute__ aligned
+----------------------------------------
+checking for Address sanitizer
+build/autotest.c: In function 'main':
+build/autotest.c:12:19: error: expected expression before '}' token
+                   }
+                   ^
+build/autotest.c: At top level:
+cc1: error: unrecognized command line option '-Wno-c++11-compat-deprecated-writable-strings' [-Werror]
+cc1: error: unrecognized command line option '-Wno-enum-conversion' [-Werror]
+cc1: error: unrecognized command line option '-Wno-invalid-source-encoding' [-Werror]
+cc1: error: unrecognized command line option '-Wno-deprecated-register' [-Werror]
+cc1: error: unrecognized command line option '-Wno-self-assign' [-Werror]
+cc1: error: unrecognized command line option '-Wno-parentheses-equality' [-Werror]
+cc1: error: unrecognized command line option '-Wno-sometimes-uninitialized' [-Werror]
+cc1: error: unrecognized command line option '-Wno-mismatched-tags' [-Werror]
+cc1: error: unrecognized command line option '-Wno-conditional-uninitialized' [-Werror]
+cc1: error: unrecognized command line option '-Wno-string-plus-int' [-Werror]
+cc1: all warnings being treated as errors
+----------
+int main(void) {
+                      return
+                  #ifdef __SANITIZE_ADDRESS__
+                          0;
+                  #else
+                      #if defined(__has_feature)
+                          #if __has_feature(address_sanitizer)
+                          0;
+                          #endif
+                      #endif
+                  #endif
+                  }
+----------
+cc -I/home/andrey/Code/nginx-builder.git/lua_src/luajit2.git/src -I/home/andrey/Code/nginx-builder.git/lua_src/luajit2.git/src -pipe -O -W -Wall -Wpointer-arith -Wno-unused-parameter -Werror -g -Wno-sign-compare -Wno-string-plus-int -Wno-deprecated-declarations -Wno-unused-parameter -Wno-unused-const-variable -Wno-conditional-uninitialized -Wno-mismatched-tags -Wno-sometimes-uninitialized -Wno-parentheses-equality -Wno-tautological-compare -Wno-self-assign -Wno-deprecated-register -Wno-deprecated -Wno-invalid-source-encoding -Wno-pointer-sign -Wno-parentheses -Wno-enum-conversion -Wno-c++11-compat-deprecated-writable-strings -Wno-write-strings -DNDK_SET_VAR -DNDK_SET_VAR -DNDK_SET_VAR -DNDK_UPSTREAM_LIST -D_GNU_SOURCE -pipe -fPIC -fvisibility=hidden -O -W -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wmissing-prototypes -Werror -g -O -o build/autotest build/autotest.c -O
+----------
+----------------------------------------
+checking for Memory sanitizer
+build/autotest.c:1:10: fatal error: sanitizer/msan_interface.h: No such file or directory
+ #include <sanitizer/msan_interface.h>
+          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+----------
+#include <sanitizer/msan_interface.h>
+                  int main(int argc, char *argv[]) {
+                      __msan_unpoison(argv, sizeof(char *));
+                      return 0;
+                  }
+----------
+cc -I/home/andrey/Code/nginx-builder.git/lua_src/luajit2.git/src -I/home/andrey/Code/nginx-builder.git/lua_src/luajit2.git/src -pipe -O -W -Wall -Wpointer-arith -Wno-unused-parameter -Werror -g -Wno-sign-compare -Wno-string-plus-int -Wno-deprecated-declarations -Wno-unused-parameter -Wno-unused-const-variable -Wno-conditional-uninitialized -Wno-mismatched-tags -Wno-sometimes-uninitialized -Wno-parentheses-equality -Wno-tautological-compare -Wno-self-assign -Wno-deprecated-register -Wno-deprecated -Wno-invalid-source-encoding -Wno-pointer-sign -Wno-parentheses -Wno-enum-conversion -Wno-c++11-compat-deprecated-writable-strings -Wno-write-strings -DNDK_SET_VAR -DNDK_SET_VAR -DNDK_SET_VAR -DNDK_UPSTREAM_LIST -D_GNU_SOURCE -pipe -fPIC -fvisibility=hidden -O -W -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wmissing-prototypes -Werror -g -O -o build/autotest build/autotest.c -O
+----------
+----------------------------------------
+checking for _mm_setcsr()
+----------------------------------------
+checking for clock_gettime(CLOCK_MONOTONIC)
+----------------------------------------
+checking for struct tm.tm_gmtoff
+----------------------------------------
+checking for altzone
+build/autotest.c: In function 'main':
+build/autotest.c:4:23: error: 'altzone' undeclared (first use in this function); did you mean 'timezone'?
+                       altzone = 0;
+                       ^~~~~~~
+                       timezone
+build/autotest.c:4:23: note: each undeclared identifier is reported only once for each function it appears in
+build/autotest.c: At top level:
+cc1: error: unrecognized command line option '-Wno-c++11-compat-deprecated-writable-strings' [-Werror]
+cc1: error: unrecognized command line option '-Wno-enum-conversion' [-Werror]
+cc1: error: unrecognized command line option '-Wno-invalid-source-encoding' [-Werror]
+cc1: error: unrecognized command line option '-Wno-deprecated-register' [-Werror]
+cc1: error: unrecognized command line option '-Wno-self-assign' [-Werror]
+cc1: error: unrecognized command line option '-Wno-parentheses-equality' [-Werror]
+cc1: error: unrecognized command line option '-Wno-sometimes-uninitialized' [-Werror]
+cc1: error: unrecognized command line option '-Wno-mismatched-tags' [-Werror]
+cc1: error: unrecognized command line option '-Wno-conditional-uninitialized' [-Werror]
+cc1: error: unrecognized command line option '-Wno-string-plus-int' [-Werror]
+cc1: all warnings being treated as errors
+----------
+#include <time.h>
+
+                  int main(void) {
+                      altzone = 0;
+                      return 0;
+                  }
+----------
+cc -I/home/andrey/Code/nginx-builder.git/lua_src/luajit2.git/src -I/home/andrey/Code/nginx-builder.git/lua_src/luajit2.git/src -pipe -O -W -Wall -Wpointer-arith -Wno-unused-parameter -Werror -g -Wno-sign-compare -Wno-string-plus-int -Wno-deprecated-declarations -Wno-unused-parameter -Wno-unused-const-variable -Wno-conditional-uninitialized -Wno-mismatched-tags -Wno-sometimes-uninitialized -Wno-parentheses-equality -Wno-tautological-compare -Wno-self-assign -Wno-deprecated-register -Wno-deprecated -Wno-invalid-source-encoding -Wno-pointer-sign -Wno-parentheses -Wno-enum-conversion -Wno-c++11-compat-deprecated-writable-strings -Wno-write-strings -DNDK_SET_VAR -DNDK_SET_VAR -DNDK_SET_VAR -DNDK_UPSTREAM_LIST -D_GNU_SOURCE -pipe -fPIC -fvisibility=hidden -O -W -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wmissing-prototypes -Werror -g -O -o build/autotest build/autotest.c -O
+----------
+----------------------------------------
+checking for posix_memalign()
+----------------------------------------
+checking for getrandom()
+----------------------------------------
+checking for explicit_bzero()
+8.44
+----------------------------------------
+checking for PCRE library
+----------------------------------------
+checking for GNU readline library
+expect version 5.45.3

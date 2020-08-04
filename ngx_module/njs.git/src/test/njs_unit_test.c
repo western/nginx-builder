@@ -895,9 +895,6 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("'A'.toString()"),
       njs_str("A") },
 
-    { njs_str("'A'.toString('hex')"),
-      njs_str("TypeError: argument must be a byte string") },
-
     { njs_str("'A'.toBytes().toString('latin1')"),
       njs_str("TypeError: Unknown encoding: \"latin1\"") },
 
@@ -2183,6 +2180,20 @@ static njs_unit_test_t  njs_test[] =
                  "var b = ++a; a +' '+ b"),
       njs_str("NaN NaN") },
 
+    { njs_str("var a = 0; a = a + ++a; a"),
+      njs_str("1") },
+
+    { njs_str("var a = 0; a += a + ++a; a"),
+      njs_str("1") },
+
+    { njs_str("var i = 0, arr = ['a', 'b'];"
+              "arr[i] = arr[i] + arr[++i]; arr"),
+      njs_str("ab,b") },
+
+    { njs_str("var i = 0, arr = ['a', 'b'];"
+              "arr[i] += arr[i] + arr[++i]; arr"),
+      njs_str("aab,b") },
+
     /* Post increment. */
 
     { njs_str("var a = 1;   a++"),
@@ -2264,6 +2275,20 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("var a = { valueOf: function() { return {} } };"
                  "var b = a++; a +' '+ b"),
       njs_str("NaN NaN") },
+
+    { njs_str("var a = 0; a = a + a++; a"),
+      njs_str("0") },
+
+    { njs_str("var a = 0; a += a + a++; a"),
+      njs_str("0") },
+
+    { njs_str("var i = 1, arr = ['a', 'b'];"
+              "arr[i] = arr[i] + arr[i++]; arr"),
+      njs_str("a,bb") },
+
+    { njs_str("var i = 1, arr = ['a', 'b'];"
+              "arr[i] += arr[i] + arr[i++]; arr"),
+      njs_str("a,bbb") },
 
     /* Decrement. */
 
@@ -2347,6 +2372,20 @@ static njs_unit_test_t  njs_test[] =
                  "var b = --a; a +' '+ b"),
       njs_str("NaN NaN") },
 
+    { njs_str("var a = 0; a = a + --a; a"),
+      njs_str("-1") },
+
+    { njs_str("var a = 0; a -= a + --a; a"),
+      njs_str("1") },
+
+    { njs_str("var i = 1, arr = ['a', 'b'];"
+              "arr[i] = arr[i] + arr[--i]; arr"),
+      njs_str("a,ba") },
+
+    { njs_str("var i = 1, arr = ['a', 'b'];"
+              "arr[i] += arr[i] + arr[--i]; arr"),
+      njs_str("a,bba") },
+
     /* Post decrement. */
 
     { njs_str("var a = 1;   a--"),
@@ -2428,6 +2467,20 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("var a = { valueOf: function() { return {} } };"
                  "var b = a--; a +' '+ b"),
       njs_str("NaN NaN") },
+
+    { njs_str("var a = 0; a = a + a--; a"),
+      njs_str("0") },
+
+    { njs_str("var a = 0; a += a + a--; a"),
+      njs_str("0") },
+
+    { njs_str("var i = 1, arr = ['a', 'b'];"
+              "arr[i] = arr[i] + arr[i--]; arr"),
+      njs_str("a,bb") },
+
+    { njs_str("var i = 1, arr = ['a', 'b'];"
+              "arr[i] += arr[i] + arr[i--]; arr"),
+      njs_str("a,bbb") },
 
     /**/
 
@@ -16903,6 +16956,10 @@ static njs_unit_test_t  njs_test[] =
     { njs_str("typeof require('crypto').createHmac('md5', 'a')"),
       njs_str("object") },
 
+    { njs_str("var cr = require('crypto'); var h = cr.createHash('sha1');"
+              "h.update.call(cr.createHmac('sha1', 's'), '')"),
+      njs_str("TypeError: \"this\" is not a hash object") },
+
     /* setTimeout(). */
 
     { njs_str("setTimeout()"),
@@ -17266,6 +17323,463 @@ static njs_unit_test_t  njs_test[] =
 
     { njs_str("var t = \"123\"; t = parseInt(t); t"),
       njs_str("123") },
+
+    /* Query String */
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=fuz');"
+              "njs.dump(obj)"),
+      njs_str("{baz:'fuz'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=');"
+              "njs.dump(obj)"),
+      njs_str("{baz:''}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=fuz&muz=tax');"
+              "njs.dump(obj)"),
+      njs_str("{baz:'fuz',muz:'tax'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=fuz&');"
+              "njs.dump(obj)"),
+      njs_str("{baz:'fuz'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('&baz=fuz');"
+              "njs.dump(obj)"),
+      njs_str("{baz:'fuz'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('&&&&&baz=fuz');"
+              "njs.dump(obj)"),
+      njs_str("{baz:'fuz'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('=fuz');"
+              "njs.dump(obj)"),
+      njs_str("{:'fuz'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('=fuz=');"
+              "njs.dump(obj)"),
+      njs_str("{:'fuz='}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('===fu=z');"
+              "njs.dump(obj)"),
+      njs_str("{:'==fu=z'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=fuz&baz=tax');"
+              "njs.dump(obj)"),
+      njs_str("{baz:['fuz','tax']}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('freespace');"
+              "njs.dump(obj)"),
+      njs_str("{freespace:''}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=fuz&muz=tax', 'fuz');"
+              "njs.dump(obj)"),
+      njs_str("{baz:'',&muz:'tax'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=fuz&muz=tax', '');"
+              "njs.dump(obj)"),
+      njs_str("{baz:'fuz',muz:'tax'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=fuz&muz=tax', null);"
+              "njs.dump(obj)"),
+      njs_str("{baz:'fuz',muz:'tax'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=fuz&muz=tax', undefined);"
+              "njs.dump(obj)"),
+      njs_str("{baz:'fuz',muz:'tax'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=fuz123muz=tax', 123);"
+              "njs.dump(obj)"),
+      njs_str("{baz:'fuz',muz:'tax'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=fuzαααmuz=tax', 'ααα');"
+              "njs.dump(obj)"),
+      njs_str("{baz:'fuz',muz:'tax'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=fuz&muz=tax', '=');"
+              "njs.dump(obj)"),
+      njs_str("{baz:'',fuz&muz:'',tax:''}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=fuz&muz=tax', null, 'fuz');"
+              "njs.dump(obj)"),
+      njs_str("{baz=:'',muz=tax:''}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=fuz&muz=tax', null, '&');"
+              "njs.dump(obj)"),
+      njs_str("{baz=fuz:'',muz=tax:''}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz123fuz&muz123tax', null, 123);"
+              "njs.dump(obj)"),
+      njs_str("{baz:'fuz',muz:'tax'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('bazαααfuz&muzαααtax', null, 'ααα');"
+              "njs.dump(obj)"),
+      njs_str("{baz:'fuz',muz:'tax'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=fuz&muz=tax', null, null, {maxKeys: 1});"
+              "njs.dump(obj)"),
+      njs_str("{baz:'fuz'}") },
+
+    { njs_str("var qs = require('querystring'); var out = [];"
+              "var obj = qs.parse('baz=fuz&muz=tax', null, null, {decodeURIComponent: (key) => {out.push(key)}});"
+              "out.join('; ');"),
+      njs_str("baz; fuz; muz; tax") },
+
+    { njs_str("var qs = require('querystring'); var i = 0;"
+              "var obj = qs.parse('baz=fuz&muz=tax', null, null, {decodeURIComponent: (key) => 'α' + i++});"
+              "njs.dump(obj);"),
+      njs_str("{α0:'α1',α2:'α3'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "qs.parse('baz=fuz&muz=tax', null, null, {decodeURIComponent: 123});"),
+      njs_str("TypeError: option decodeURIComponent is not a function") },
+
+    { njs_str("var qs = require('querystring');"
+              "qs.unescape = 123;"
+              "qs.parse('baz=fuz&muz=tax');"),
+    njs_str("TypeError: QueryString.unescape is not a function") },
+
+    { njs_str("var qs = require('querystring'); var out = [];"
+              "qs.unescape = (key) => {out.push(key)};"
+              "qs.parse('baz=fuz&muz=tax');"
+              "out.join('; ');"),
+      njs_str("baz; fuz; muz; tax") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('ba%32z=f%32uz');"
+              "njs.dump(obj)"),
+      njs_str("{ba2z:'f2uz'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('ba%32z=f%32uz');"
+              "njs.dump(obj)"),
+      njs_str("{ba2z:'f2uz'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('ba%F0%9F%92%A9z=f%F0%9F%92%A9uz');"
+              "njs.dump(obj)"),
+      njs_str("{ba💩z:'f💩uz'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('======');"
+              "njs.dump(obj)"),
+      njs_str("{:'====='}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=%F0%9F%A9');"
+              "njs.dump(obj)"),
+      njs_str("{baz:'�'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=αααααα%\x00\x01\x02αααα');"
+              "njs.dump(obj)"),
+      njs_str("{baz:'αααααα%\\u0000\\u0001\\u0002αααα'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=%F6α');"
+              "njs.dump(obj)"),
+      njs_str("{baz:'�α'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=%F6');"
+              "njs.dump(obj)"),
+      njs_str("{baz:'�'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=%FG');"
+              "njs.dump(obj)"),
+      njs_str("{baz:'%FG'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=%F');"
+              "njs.dump(obj)"),
+      njs_str("{baz:'%F'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('baz=%');"
+              "njs.dump(obj)"),
+      njs_str("{baz:'%'}") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = qs.parse('ba+z=f+uz');"
+              "njs.dump(obj)"),
+      njs_str("{ba z:'f uz'}") },
+
+
+    { njs_str("var qs = require('querystring');"
+              "qs.parse('X='+'α'.repeat(33)).X.length"),
+      njs_str("33") },
+
+    { njs_str("var qs = require('querystring');"
+              "var x = qs.parse('X='+'α1'.repeat(33)).X;"
+              "[x.length, x[33], x[34]]"),
+      njs_str("66,1,α") },
+
+    { njs_str("var qs = require('querystring');"
+              "var s = qs.parse('X='+String.bytesFrom(Array(16).fill(0x9d))).X;"
+              "[s.length, s.toUTF8().length, s[15]]"),
+      njs_str("16,48,�") },
+
+    { njs_str("var qs = require('querystring');"
+              "qs.stringify({'baz': 'fuz'})"),
+      njs_str("baz=fuz") },
+
+    { njs_str("var qs = require('querystring');"
+              "qs.stringify({'baz': 'fuz', 'muz': 'tax'})"),
+      njs_str("baz=fuz&muz=tax") },
+
+    { njs_str("var qs = require('querystring');"
+              "qs.stringify({'baαz': 'fαuz', 'muαz': 'tαax'});"),
+      njs_str("ba%CE%B1z=f%CE%B1uz&mu%CE%B1z=t%CE%B1ax") },
+
+    { njs_str("var qs = require('querystring');"
+              "qs.stringify({'baz': ['fuz', 'tax']})"),
+      njs_str("baz=fuz&baz=tax") },
+
+    { njs_str("var qs = require('querystring');"
+              njs_declare_sparse_array("arr", 2)
+              "arr[0] = 0; arr[1] = 1.5;"
+              "qs.stringify({'baz': arr})"),
+      njs_str("baz=0&baz=1.5") },
+
+    { njs_str("var qs = require('querystring'); var out = [];"
+              "qs.stringify({'baz': 'fuz', 'muz': 'tax'}, null, null, {encodeURIComponent: (key) => {out.push(key)}});"
+              "out.join('; ')"),
+      njs_str("baz; fuz; muz; tax") },
+
+    { njs_str("var qs = require('querystring'); "
+              "qs.stringify({a: 'b'}, null, null, "
+              "             {encodeURIComponent: () => String.bytesFrom([0x9d])})"),
+      njs_str("TypeError: got non-UTF8 string from encoder") },
+
+    { njs_str("var qs = require('querystring');"
+              "qs.stringify({'baz': 'fuz', 'muz': 'tax'}, null, null, {encodeURIComponent: 123});"
+              "out.join('; ')"),
+      njs_str("TypeError: option encodeURIComponent is not a function") },
+
+    { njs_str("var qs = require('querystring');"
+              "qs.escape = 123;"
+              "qs.stringify({'baz': 'fuz', 'muz': 'tax'})"),
+      njs_str("TypeError: QueryString.escape is not a function") },
+
+    { njs_str("var qs = require('querystring'); var out = [];"
+              "qs.escape = (key) => {out.push(key)};"
+              "qs.stringify({'baz': 'fuz', 'muz': 'tax'});"
+              "out.join('; ')"),
+      njs_str("baz; fuz; muz; tax") },
+
+    { njs_str("var qs = require('querystring');"
+              "qs.stringify({'baz': 'fuz', 'muz': 'tax'}, '****')"),
+      njs_str("baz=fuz****muz=tax") },
+
+    { njs_str("var qs = require('querystring');"
+              "qs.stringify({'baz': 'fuz', 'muz': 'tax'}, null, '^^^^')"),
+      njs_str("baz^^^^fuz&muz^^^^tax") },
+
+    { njs_str("var qs = require('querystring');"
+              "var obj = {A:'α'}; obj['δ'] = 'D';"
+              "var s = qs.stringify(obj,'γ=','&β'); [s, s.length]"),
+      njs_str("A&β%CE%B1γ=%CE%B4&βD,20") },
+
+    { njs_str("var qs = require('querystring');"
+              "qs.stringify({'baz': 'fuz', 'muz': 'tax'}, '', '')"),
+      njs_str("baz=fuz&muz=tax") },
+
+    { njs_str("var qs = require('querystring');"
+              "qs.stringify({'baz': 'fuz', 'muz': 'tax'}, undefined, undefined)"),
+      njs_str("baz=fuz&muz=tax") },
+
+    { njs_str("var qs = require('querystring');"
+              "qs.stringify({'baz': 'fuz', 'muz': 'tax'}, '?', '/')"),
+      njs_str("baz/fuz?muz/tax") },
+
+    { njs_str("var qs = require('querystring');"
+              "qs.stringify('123')"),
+      njs_str("") },
+
+    { njs_str("var qs = require('querystring');"
+              "qs.stringify(123)"),
+      njs_str("") },
+
+    { njs_str("var qs = require('querystring');"
+              "qs.stringify({X: String.bytesFrom(Array(4).fill(0x9d))})"),
+      njs_str("X=%9D%9D%9D%9D") },
+
+    { njs_str("var qs = require('querystring');"
+              "qs.stringify({X:{toString(){return 3}}})"),
+      njs_str("X=3") },
+
+    { njs_str("var qs = require('querystring');"
+              "qs.escape('abcααααdef')"),
+      njs_str("abc%CE%B1%CE%B1%CE%B1%CE%B1def") },
+
+    { njs_str("var qs = require('querystring');"
+              "qs.unescape('abc%CE%B1%CE%B1%CE%B1%CE%B1def')"),
+      njs_str("abcααααdef") },
+
+    /* TextEncoder. */
+
+    { njs_str("var en = new TextEncoder(); typeof en.encode()"),
+      njs_str("object") },
+
+    { njs_str("var en = new TextEncoder(); en.encode()"),
+      njs_str("") },
+
+    { njs_str("var en = new TextEncoder(); var res = en.encode('α'); res"),
+      njs_str("206,177") },
+
+    { njs_str("var en = new TextEncoder(); var res = en.encode('α1α'); res[2]"),
+      njs_str("49") },
+
+    { njs_str("var en = new TextEncoder(); en.encode(String.bytesFrom([0xCE]))"),
+      njs_str("239,191,189") },
+
+    { njs_str("var en = new TextEncoder();"
+              "en.encode(String.bytesFrom([0xCE, 0xB1, 0xCE]))"),
+      njs_str("206,177,239,191,189") },
+
+    { njs_str("var en = new TextEncoder();"
+              "en.encode(String.bytesFrom([0xCE, 0xCE, 0xB1]))"),
+      njs_str("239,191,189,206,177") },
+
+    { njs_str("var en = new TextEncoder(); en.encoding"),
+      njs_str("utf-8") },
+
+    { njs_str("TextEncoder.prototype.encode.apply({}, [])"),
+      njs_str("TypeError: \"this\" is not a TextEncoder") },
+
+    { njs_str("var en = new TextEncoder();"
+              "var utf8 = new Uint8Array(5);"
+              "var res = en.encodeInto('ααααα', utf8); njs.dump(res)"),
+      njs_str("{read:2,written:4}") },
+
+    { njs_str("var en = new TextEncoder();"
+              "var utf8 = new Uint8Array(10);"
+              "var res = en.encodeInto('ααααα', utf8); njs.dump(res)"),
+      njs_str("{read:5,written:10}") },
+
+    { njs_str("var str = String.bytesFrom([0xCE]);"
+              "var en = new TextEncoder();"
+              "var utf8 = new Uint8Array(3);"
+              "var res = en.encodeInto(str, utf8); "
+              "[njs.dump(res), utf8]"),
+      njs_str("{read:1,written:3},239,191,189") },
+
+    { njs_str("var str = String.bytesFrom([0xCE]);"
+              "var en = new TextEncoder();"
+              "var utf8 = new Uint8Array(5);"
+              "en.encodeInto(str, utf8); utf8"),
+      njs_str("239,191,189,0,0") },
+
+    { njs_str("var str = String.bytesFrom([0xCE, 0xB1, 0xCE]);"
+              "var en = new TextEncoder();"
+              "var utf8 = new Uint8Array(5);"
+              "var res = en.encodeInto(str, utf8);"
+              "[njs.dump(res), utf8]"),
+      njs_str("{read:2,written:5},206,177,239,191,189") },
+
+    { njs_str("var str = String.bytesFrom([0xCE, 0xCE, 0xB1]);"
+              "var en = new TextEncoder();"
+              "var utf8 = new Uint8Array(5);"
+              "var res = en.encodeInto(str, utf8);"
+              "[njs.dump(res), utf8]"),
+      njs_str("{read:2,written:5},239,191,189,206,177") },
+
+    { njs_str("TextEncoder.prototype.encodeInto.apply({}, [])"),
+      njs_str("TypeError: \"this\" is not a TextEncoder") },
+
+    { njs_str("(new TextEncoder()).encodeInto('', 0.12) "),
+      njs_str("TypeError: The \"destination\" argument must be an instance of Uint8Array") },
+
+    /* TextDecoder. */
+
+    { njs_str("var de = new TextDecoder();"
+              "var u8arr = new Uint8Array([240, 160, 174, 183]);"
+              "var u16arr = new Uint16Array([41200, 47022]);"
+              "var u32arr = new Uint32Array([3081674992]);"
+              "[u8arr, u16arr, u32arr].map(v=>de.decode(v)).join(',')"),
+      njs_str("𠮷,𠮷,𠮷") },
+
+    { njs_str("var de = new TextDecoder();"
+              "[new Uint8Array([240, 160]), "
+              " new Uint8Array([174]), "
+              " new Uint8Array([183])].map(v=>de.decode(v, {stream: 1}))[2]"),
+      njs_str("𠮷") },
+
+    { njs_str("var de = new TextDecoder();"
+              "de.decode(new Uint8Array([240, 160]), {stream: 1});"
+              "de.decode(new Uint8Array([174]), {stream: 1});"
+              "de.decode(new Uint8Array([183]))"),
+      njs_str("𠮷") },
+
+    { njs_str("var de = new TextDecoder();"
+              "de.decode(new Uint8Array([240, 160]), {stream: 1});"
+              "de.decode()"),
+      njs_str("�") },
+
+    { njs_str("var de = new TextDecoder('utf-8', {fatal: true});"
+              "de.decode(new Uint8Array([240, 160]))"),
+      njs_str("TypeError: The encoded data was not valid") },
+
+    { njs_str("var de = new TextDecoder('utf-8', {fatal: false});"
+              "de.decode(new Uint8Array([240, 160]))"),
+      njs_str("�") },
+
+    { njs_str("var en = new TextEncoder();"
+              "var de = new TextDecoder('utf-8', {ignoreBOM: true});"
+              "en.encode(de.decode(new Uint8Array([239, 187, 191, 50])))"),
+      njs_str("239,187,191,50") },
+
+    { njs_str("var en = new TextEncoder();"
+              "var de = new TextDecoder('utf-8', {ignoreBOM: false});"
+              "en.encode(de.decode(new Uint8Array([239, 187, 191, 50])))"),
+      njs_str("50") },
+
+    { njs_str("var en = new TextEncoder(); var de = new TextDecoder();"
+              "en.encode(de.decode(new Uint8Array([239, 187, 191, 50])))"),
+      njs_str("50") },
+
+    { njs_str("var de = new TextDecoder(); de.decode('')"),
+      njs_str("TypeError: The \"input\" argument must be an instance of TypedArray") },
+
+    { njs_str("var de = new TextDecoder({})"),
+      njs_str("RangeError: The \"[object Object]\" encoding is not supported") },
+
+    { njs_str("var de = new TextDecoder('foo')"),
+      njs_str("RangeError: The \"foo\" encoding is not supported") },
+
+    { njs_str("var de = new TextDecoder(); de.encoding"),
+      njs_str("utf-8") },
+
+    { njs_str("var de = new TextDecoder(); de.fatal"),
+      njs_str("false") },
+
+    { njs_str("var de = new TextDecoder(); de.ignoreBOM"),
+      njs_str("false") },
+
+    { njs_str("TextDecoder.prototype.decode.apply({}, new Uint8Array([1]))"),
+      njs_str("TypeError: \"this\" is not a TextDecoder") },
 };
 
 

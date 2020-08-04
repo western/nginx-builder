@@ -73,9 +73,9 @@ extern const njs_value_t            njs_value_undefined;
  *
  * njs_prop_handler_t is expected to return:
  *   NJS_OK - handler executed successfully;
- *   NJS_ERROR - some error, vm->retval contains appropriate exception;
- *   NJS_DECLINED - handler was applied to inappropriate object, vm->retval
- *   contains undefined value.
+ *   NJS_DECLINED - handler was applied to inappropriate object, retval
+ *   contains undefined value;
+ *   NJS_ERROR - some error, vm->retval contains appropriate exception.
  */
 typedef njs_int_t (*njs_prop_handler_t) (njs_vm_t *vm, njs_object_prop_t *prop,
     njs_value_t *value, njs_value_t *setval, njs_value_t *retval);
@@ -341,11 +341,9 @@ NJS_EXPORT void njs_vm_memory_error(njs_vm_t *vm);
 NJS_EXPORT void njs_value_undefined_set(njs_value_t *value);
 NJS_EXPORT void njs_value_boolean_set(njs_value_t *value, int yn);
 NJS_EXPORT void njs_value_number_set(njs_value_t *value, double num);
-NJS_EXPORT void njs_value_data_set(njs_value_t *value, void *data);
 
 NJS_EXPORT uint8_t njs_value_bool(const njs_value_t *value);
 NJS_EXPORT double njs_value_number(const njs_value_t *value);
-NJS_EXPORT void *njs_value_data(const njs_value_t *value);
 NJS_EXPORT njs_function_t *njs_value_function(const njs_value_t *value);
 
 NJS_EXPORT uint16_t njs_vm_prop_magic16(njs_object_prop_t *prop);

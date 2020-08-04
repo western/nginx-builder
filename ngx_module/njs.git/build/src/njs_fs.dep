@@ -1,0 +1,18 @@
+build/src/njs_fs.o: src/njs_fs.c src/njs_main.h build/njs_auto_config.h \
+ src/njs_unix.h src/njs_types.h src/njs_clang.h src/njs_str.h \
+ src/njs_unicode.h src/njs_utf8.h src/njs_utf16.h src/njs_diyfp.h \
+ src/njs_dtoa.h src/njs_dtoa_fixed.h src/njs_strtod.h src/njs_djb_hash.h \
+ src/njs_murmur_hash.h src/njs_trace.h src/njs_queue.h src/njs_lvlhsh.h \
+ src/njs_random.h src/njs_time.h src/njs_file.h src/njs_malloc.h \
+ src/njs_rbtree.h src/njs_mp.h src/njs_arr.h src/njs_chb.h \
+ src/njs_utils.h src/njs_sprintf.h src/njs_pcre.h src/njs_regex.h \
+ src/njs_md5.h src/njs_sha1.h src/njs_sha2.h src/njs.h src/njs_value.h \
+ src/njs_vm.h src/njs_error.h src/njs_number.h src/njs_value_conversion.h \
+ src/njs_vmcode.h src/njs_variable.h src/njs_lexer.h src/njs_parser.h \
+ src/njs_generator.h src/njs_boolean.h src/njs_symbol.h src/njs_string.h \
+ src/njs_object.h src/njs_object_hash.h src/njs_array.h \
+ src/njs_array_buffer.h src/njs_typed_array.h src/njs_function.h \
+ src/njs_regexp.h src/njs_regexp_pattern.h src/njs_date.h \
+ src/njs_promise.h src/njs_math.h src/njs_json.h src/njs_encoding.h \
+ src/njs_timer.h src/njs_module.h src/njs_fs.h src/njs_crypto.h \
+ src/njs_query_string.h src/njs_event.h
