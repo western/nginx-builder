@@ -332,7 +332,7 @@ function ngx_module {
     mkdir ngx_module ; cd ngx_module
     
     get_github 'openresty' 'memc-nginx-module.git'
-    get_github 'openresty' 'lua-nginx-module.git' 'v0.10.16rc5'
+    get_github 'openresty' 'lua-nginx-module.git' 'v0.10.17'
     get_github 'simplresty' 'ngx_devel_kit.git'
     get_github 'openresty' 'redis2-nginx-module.git'
     get_github 'openresty' 'echo-nginx-module.git'
@@ -353,7 +353,7 @@ function ngx_module {
     get_github 'openresty' 'ngx_postgres.git'
     get_github 'nginx'     'njs.git'
     
-    get_github 'openresty' 'stream-lua-nginx-module.git' 'v0.0.7'
+    get_github 'openresty' 'stream-lua-nginx-module.git' 'v0.0.8'
     get_github 'openresty' 'xss-nginx-module.git'
     
     get_github 'arut' 'nginx-rtmp-module.git'
@@ -407,9 +407,9 @@ function lua_src {
         mkdir -p /opt/lua_src ; cd /opt/lua_src
     fi
     
-    get_github 'openresty' 'lua-resty-core.git' 'v0.1.17'
-    get_github 'openresty' 'lua-resty-lrucache.git' 'v0.09'
-    get_github 'openresty' 'lua-cjson.git' '2.1.0.7'
+    get_github 'openresty' 'lua-resty-core.git' 'v0.1.19'
+    get_github 'openresty' 'lua-resty-lrucache.git' 'v0.10'
+    get_github 'openresty' 'lua-cjson.git' '2.1.0.8'
     
     if [ $IS_GET_ONLY == 0 ]; then
         local LUAJIT2_SRC=""
@@ -444,7 +444,7 @@ function lua_src {
         popd
     fi
     get_github 'openresty' 'lua-tablepool.git' 'v0.01'
-    get_github 'openresty' 'lua-resty-shell.git' 'v0.02'
+    get_github 'openresty' 'lua-resty-shell.git' 'v0.03'
     
     get_github 'openresty' 'lua-resty-limit-traffic.git'
     get_github 'openresty' 'lua-resty-lock.git'
