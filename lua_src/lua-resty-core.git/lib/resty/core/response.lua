@@ -13,7 +13,7 @@ local FFI_BAD_CONTEXT = base.FFI_BAD_CONTEXT
 local FFI_NO_REQ_CTX = base.FFI_NO_REQ_CTX
 local FFI_DECLINED = base.FFI_DECLINED
 local get_string_buf = base.get_string_buf
-local getmetatable = getmetatable
+local setmetatable = setmetatable
 local type = type
 local tostring = tostring
 local get_request = base.get_request
@@ -68,6 +68,10 @@ local function set_resp_header(tb, key, value, no_override)
 
         if type(value) == "table" then
             mvals_len = #value
+            if mvals_len == 0 and no_override then
+                return
+            end
+
             buf = get_string_buf(ffi_str_size * mvals_len)
             mvals = ffi_cast(ffi_str_type, buf)
             for i = 1, mvals_len do
@@ -168,9 +172,11 @@ end
 
 
 do
-    local mt = getmetatable(ngx.header)
+    local mt = new_tab(0, 2)
     mt.__newindex = set_resp_header
     mt.__index = get_resp_header
+
+    ngx.header = setmetatable(new_tab(0, 0), mt)
 end
 
 

@@ -4,7 +4,7 @@ use t::TestCore;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 3 + 17);
+plan tests => repeat_each() * (blocks() * 3 + 20);
 
 add_block_preprocessor(sub {
     my $block = shift;
@@ -150,24 +150,15 @@ API disabled in the context of log_by_lua
         content_by_lua_block {
             local ngx_pipe = require "ngx.pipe"
             local proc, err = ngx_pipe.spawn({"sleep", 0.1})
-            if not proc then
-                ngx.say(err)
-                return
-            end
-
-            local ok, err = pcall(function()
-                local ok, reason, status = proc.wait()
-            end)
-
-            if not ok then
-                ngx.say(err)
-            else
-                ngx.say("ok")
-            end
+            proc.wait()
         }
     }
---- response_body_like
-not a process instance
+--- error_code: 500
+--- ignore_response_body
+--- error_log eval
+qr/\[error\] .*? runtime error: content_by_lua\(nginx\.conf\:\d+\):\d+: not a process instance/
+--- no_error_log
+[crit]
 
 
 
@@ -497,19 +488,19 @@ signal
 --- response_body
 write_timeout:
 set_timeouts: ok
-failed to set timeouts: bad timeout value
+failed to set timeouts: bad write_timeout option
 
 stdout_read_timeout:
 set_timeouts: ok
-failed to set timeouts: bad timeout value
+failed to set timeouts: bad stdout_read_timeout option
 
 stderr_read_timeout:
 set_timeouts: ok
-failed to set timeouts: bad timeout value
+failed to set timeouts: bad stderr_read_timeout option
 
 wait_timeout:
 set_timeouts: ok
-failed to set timeouts: bad timeout value
+failed to set timeouts: bad wait_timeout option
 
 
 
@@ -552,16 +543,16 @@ failed to set timeouts: bad timeout value
 set_timeouts: ok
 
 write_timeout:
-failed to set timeouts: bad timeout value
+failed to set timeouts: bad write_timeout option
 
 stdout_read_timeout:
-failed to set timeouts: bad timeout value
+failed to set timeouts: bad stdout_read_timeout option
 
 stderr_read_timeout:
-failed to set timeouts: bad timeout value
+failed to set timeouts: bad stderr_read_timeout option
 
 wait_timeout:
-failed to set timeouts: bad timeout value
+failed to set timeouts: bad wait_timeout option
 
 
 
@@ -831,16 +822,30 @@ bad shutdown arg: 0
             local proc = ngx_pipe.spawn({"sleep", "10s"})
             proc:set_timeouts(100, 100, 100)
 
-            ngx.thread.spawn(function() proc:stdout_read_line() end)
+            ngx.thread.spawn(function()
+                local ok, err = proc:stdout_read_line()
+                if not ok then
+                    ngx.say("read stdout err: ", err)
+                else
+                    ngx.say("read stdout ok")
+                end
+            end)
             local ok, err = proc:shutdown('stdout')
             if not ok then
-                ngx.say(err)
+                ngx.say("shutdown stdout err: ", err)
             end
 
-            ngx.thread.spawn(function() proc:stderr_read_line() end)
+            ngx.thread.spawn(function()
+                local ok, err = proc:stderr_read_line()
+                if not ok then
+                    ngx.say("read stderr err: ", err)
+                else
+                    ngx.say("read stderr ok")
+                end
+            end)
             local ok, err = proc:shutdown('stderr')
             if not ok then
-                ngx.say(err)
+                ngx.say("shutdown stderr err: ", err)
             end
 
             local data = ("1234"):rep(2048)
@@ -850,7 +855,7 @@ bad shutdown arg: 0
             while true do
                 local data, err = proc:write(data)
                 if not data then
-                    ngx.say(err)
+                    ngx.say("write stdin err: ", err)
                     break
                 end
 
@@ -860,18 +865,25 @@ bad shutdown arg: 0
                 end
             end
 
-            ngx.thread.spawn(function() proc:write(data) end)
+            ngx.thread.spawn(function()
+                local ok, err = proc:write(data)
+                if not ok then
+                    ngx.say("write stdin err: ", err)
+                else
+                    ngx.say("write stdin ok")
+                end
+            end)
             local ok, err = proc:shutdown('stdin')
             if not ok then
-                ngx.say(err)
+                ngx.say("shutdown stdin err: ", err)
             end
         }
     }
 --- response_body
-pipe busy reading
-pipe busy reading
-timeout
-pipe busy writing
+read stdout err: aborted
+read stderr err: aborted
+write stdin err: timeout
+write stdin err: aborted
 --- no_error_log
 [error]
 --- grep_error_log eval
@@ -1599,3 +1611,296 @@ stdout: ok
 stderr err: closed
 --- no_error_log
 [error]
+
+
+
+=== TEST 45: spawn process, with environ option (sanity)
+--- config
+    location = /t {
+        content_by_lua_block {
+            local ngx_pipe = require "ngx.pipe"
+
+            local proc, err = ngx_pipe.spawn('echo $TEST_ENV', {
+                environ = { "TEST_ENV=blahblah" }
+            })
+            if not proc then
+                ngx.say(err)
+                return
+            end
+
+            local data, err = proc:stdout_read_line()
+            if not data then
+                ngx.say(err)
+            else
+                ngx.say(data)
+            end
+        }
+    }
+--- response_body
+blahblah
+
+
+
+=== TEST 46: spawn process, with environ option (multiple values)
+--- config
+    location = /t {
+        content_by_lua_block {
+            local ngx_pipe = require "ngx.pipe"
+
+            local proc, err = ngx_pipe.spawn('echo "$TEST_ENV $TEST_FOO"', {
+                environ = { "TEST_ENV=blahblah", "TEST_FOO=hello" }
+            })
+            if not proc then
+                ngx.say(err)
+                return
+            end
+
+            local data, err = proc:stdout_read_line()
+            if not data then
+                ngx.say(err)
+            else
+                ngx.say(data)
+            end
+        }
+    }
+--- response_body
+blahblah hello
+
+
+
+=== TEST 47: spawn process, with empty environ option (no values)
+--- config
+    location = /t {
+        content_by_lua_block {
+            local ngx_pipe = require "ngx.pipe"
+
+            local proc, err = ngx_pipe.spawn('echo "TEST_ENV:$TEST_ENV"', {
+                environ = {}
+            })
+            if not proc then
+                ngx.say(err)
+                return
+            end
+
+            local data, err = proc:stdout_read_line()
+            if not data then
+                ngx.say(err)
+            else
+                ngx.say(data)
+            end
+        }
+    }
+--- response_body
+TEST_ENV:
+
+
+
+=== TEST 48: spawn process, with invalid environ option
+--- config
+    location = /t {
+        content_by_lua_block {
+            local ngx_pipe = require "ngx.pipe"
+
+            local function spawn(environ)
+                local pok, perr = pcall(ngx_pipe.spawn, 'echo $TEST_ENV', {
+                    environ = environ
+                })
+                if not pok then
+                    ngx.say(perr)
+                else
+                    ngx.say("ok")
+                end
+            end
+
+            spawn("TEST_ENV=1")
+            spawn({ "TEST_ENV=", 1 })
+            spawn({ "TEST_ENV" })
+            spawn({ "=1" })
+        }
+    }
+--- response_body
+bad environ option: table expected, got string
+bad value at index 2 of environ option: string expected, got number
+bad value at index 1 of environ option: 'name=[value]' format expected, got 'TEST_ENV'
+bad value at index 1 of environ option: 'name=[value]' format expected, got '=1'
+
+
+
+=== TEST 49: spawn process, with invalid environ option
+--- config
+    location = /t {
+        content_by_lua_block {
+            local ngx_pipe = require "ngx.pipe"
+
+            local function spawn(environ)
+                local pok, perr = pcall(ngx_pipe.spawn, 'echo "TEST_ENV:$TEST_ENV"', {
+                    environ = environ
+                })
+                if not pok then
+                    ngx.say(perr)
+                    return
+                end
+
+                local proc = perr
+
+                local data, err = proc:stdout_read_line()
+                if not data then
+                    ngx.say(err)
+                else
+                    ngx.say(data)
+                end
+            end
+
+            spawn({ "TEST_ENV =1" })
+            spawn({ "TEST_ENV= 1" })
+            spawn({ "TEST_ENV==1" })
+        }
+    }
+--- response_body
+TEST_ENV:
+TEST_ENV: 1
+TEST_ENV:=1
+
+
+
+=== TEST 50: spawn process, with environ option containing nil holes
+--- config
+    location = /t {
+        content_by_lua_block {
+            local ngx_pipe = require "ngx.pipe"
+
+            local function spawn(environ)
+                local proc, err = ngx_pipe.spawn('echo "$TEST_ENV2$TEST_ENV"', {
+                    environ = environ
+                })
+                if not proc then
+                    ngx.say(err)
+                    return
+                end
+
+                local data, err = proc:stdout_read_line()
+                if not data then
+                    ngx.say(err)
+                else
+                    ngx.say(data)
+                end
+            end
+
+            spawn({ "TEST_ENV=1", nil, "TEST_ENV2=2", nil })
+            spawn({ "TEST_ENV=1", nil, "TEST_ENV2=2" })
+            spawn({ nil, "TEST_ENV=1", "TEST_ENV2=2"})
+            spawn({ hash_key = true, "TEST_ENV=1", nil, "TEST_ENV2=2", nil })
+            spawn({ hash_key = true, "TEST_ENV=1", nil, "TEST_ENV2=2" })
+        }
+    }
+--- response_body
+1
+1
+
+1
+1
+
+
+
+=== TEST 51: spawn process with wait_timeout option
+--- config
+    location = /t {
+        content_by_lua_block {
+            local ngx_pipe = require "ngx.pipe"
+            local proc, err = ngx_pipe.spawn({"sleep", 1}, {
+                wait_timeout = 100
+            })
+
+            local ok, err = proc:wait()
+            if not ok then
+                ngx.say(err)
+            else
+                ngx.say("ok")
+            end
+        }
+    }
+--- response_body
+timeout
+
+
+
+=== TEST 52: validate timeout options when spawning process
+--- config
+    location = /t {
+        content_by_lua_block {
+            local ngx_pipe = require "ngx.pipe"
+
+            local function spawn(opts)
+                local ok, err = pcall(ngx_pipe.spawn, {"sleep", "5s"}, opts)
+                if not ok then
+                    ngx.say(err)
+                else
+                    ngx.say("ok")
+                end
+            end
+
+            ngx.say("write_timeout:")
+            spawn({write_timeout = 2 ^ 32})
+            spawn({write_timeout = -1})
+
+            ngx.say("\nstdout_read_timeout:")
+            spawn({stdout_read_timeout = 2 ^ 32})
+            spawn({stdout_read_timeout = -1})
+
+            ngx.say("\nstderr_read_timeout:")
+            spawn({stderr_read_timeout = 2 ^ 32})
+            spawn({stderr_read_timeout = -1})
+
+            ngx.say("\nwait_timeout:")
+            spawn({wait_timeout = 2 ^ 32})
+            spawn({wait_timeout = -1})
+        }
+    }
+--- response_body
+write_timeout:
+bad write_timeout option
+bad write_timeout option
+
+stdout_read_timeout:
+bad stdout_read_timeout option
+bad stdout_read_timeout option
+
+stderr_read_timeout:
+bad stderr_read_timeout option
+bad stderr_read_timeout option
+
+wait_timeout:
+bad wait_timeout option
+bad wait_timeout option
+
+
+
+=== TEST 53: validate timeout options when spawning process
+--- config
+    location = /t {
+        content_by_lua_block {
+            local ngx_pipe = require "ngx.pipe"
+
+            local function spawn(opts)
+                local ok, err = pcall(ngx_pipe.spawn, {"sleep", "5s"}, opts)
+                if not ok then
+                    ngx.log(ngx.ERR, err)
+                end
+            end
+
+            spawn({write_timeout = -1})
+            spawn({stdout_read_timeout = -1})
+            spawn({stderr_read_timeout = -1})
+            spawn({wait_timeout = -1})
+        }
+    }
+--- ignore_response_body
+--- error_log eval
+[
+    qr/\[error\] .*? content_by_lua\(nginx\.conf:\d+\):\d+: .*? bad write_timeout option/,
+    qr/\[error\] .*? content_by_lua\(nginx\.conf:\d+\):\d+: .*? bad stdout_read_timeout option/,
+    qr/\[error\] .*? content_by_lua\(nginx\.conf:\d+\):\d+: .*? bad stderr_read_timeout option/,
+    qr/\[error\] .*? content_by_lua\(nginx\.conf:\d+\):\d+: .*? bad wait_timeout option/
+]
+--- no_error_log
+[crit]

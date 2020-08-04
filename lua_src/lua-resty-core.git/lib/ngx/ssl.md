@@ -162,7 +162,7 @@ the conversion. You can always use libraries like [lua-resty-lrucache](https://g
 and/or ngx_lua APIs like [lua_shared_dict](https://github.com/openresty/lua-nginx-module#lua_shared_dict)
 to do the caching of the DER-formatted results, for example.
 
-This function can be called in whatever contexts.
+This function can be called in any context.
 
 [Back to TOC](#table-of-contents)
 
@@ -202,7 +202,7 @@ Alternatively, you can do the PEM to DER conversion *offline* with the `openssl`
 openssl rsa -in key.pem -outform DER -out key.der
 ```
 
-This function can be called in whatever contexts.
+This function can be called in any context.
 
 [Back to TOC](#table-of-contents)
 
@@ -247,7 +247,7 @@ missing from the client handshake request, we use the server IP address accessed
 by the client to identify the site. See the [raw_server_addr](#raw_server_addr) method
 for more details.
 
-This function can be called in whatever contexts where downstream https is used.
+This function can be called in any context where downstream https is used.
 
 [Back to TOC](#table-of-contents)
 
@@ -297,7 +297,7 @@ else  -- IPv6
 end
 ```
 
-This function can be called in whatever contexts where downstream https is used.
+This function can be called in any context where downstream https is used.
 
 [Back to TOC](#table-of-contents)
 
@@ -347,7 +347,7 @@ else  -- IPv6
 end
 ```
 
-This function can be called in whatever contexts where downstream https is used.
+This function can be called in any context where downstream https is used.
 
 This function was first introduced in lua-resty-core 0.1.14.
 
@@ -362,14 +362,15 @@ get_tls1_version
 Returns the TLS 1.x version number used by the current SSL connection. Returns `nil` and
 a string describing the error otherwise.
 
-Typical return values are
+Typical return values are:
 
 * `0x0300`(SSLv3)
 * `0x0301`(TLSv1)
 * `0x0302`(TLSv1.1)
 * `0x0303`(TLSv1.2)
+* `0x0304`(TLSv1.3)
 
-This function can be called in whatever contexts where downstream https is used.
+This function can be called in any context where downstream https is used.
 
 [Back to TOC](#table-of-contents)
 
@@ -382,19 +383,23 @@ get_tls1_version_str
 Returns the TLS 1.x version string used by the current SSL connection. Returns `nil` and
 a string describing the error otherwise.
 
-Typical return values are
+If the TLS 1.x version number used by the current SSL connection is not
+recognized, the return values will be `nil` and the string "unknown version".
+
+Typical return values are:
 
 * `SSLv3`
 * `TLSv1`
 * `TLSv1.1`
 * `TLSv1.2`
+* `TLSv1.3`
 
-This function can be called in whatever contexts where downstream https is used.
+This function can be called in any context where downstream https is used.
 
 [Back to TOC](#table-of-contents)
 
 parse_pem_cert
-----------------
+--------------
 **syntax:** *cert_chain, err = ssl.parse_pem_cert(pem_cert_chain)*
 
 **context:** *any*
@@ -408,14 +413,14 @@ In case of failures, returns `nil` and a string describing the error.
 You can always use libraries like [lua-resty-lrucache](https://github.com/openresty/lua-resty-lrucache#readme)
 to cache the cdata result.
 
-This function can be called in whatever contexts.
+This function can be called in any context.
 
 This function was first added in version `0.1.7`.
 
 [Back to TOC](#table-of-contents)
 
 parse_pem_priv_key
-----------------
+------------------
 **syntax:** *priv_key, err = ssl.parse_pem_priv_key(pem_priv_key)*
 
 **context:** *any*
@@ -426,14 +431,14 @@ function, for example).
 
 In case of failures, returns `nil` and a string describing the error.
 
-This function can be called in whatever contexts.
+This function can be called in any context.
 
 This function was first added in version `0.1.7`.
 
 [Back to TOC](#table-of-contents)
 
 set_cert
-------------
+--------
 **syntax:** *ok, err = ssl.set_cert(cert_chain)*
 
 **context:** *ssl_certificate_by_lua&#42;*

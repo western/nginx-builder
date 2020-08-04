@@ -385,12 +385,14 @@ do
     _M.TLS1_VERSION = 0x0301
     _M.TLS1_1_VERSION = 0x0302
     _M.TLS1_2_VERSION = 0x0303
+    _M.TLS1_3_VERSION = 0x0304
 
     local map = {
         [_M.SSL3_VERSION] = "SSLv3",
         [_M.TLS1_VERSION] = "TLSv1",
         [_M.TLS1_1_VERSION] = "TLSv1.1",
         [_M.TLS1_2_VERSION] = "TLSv1.2",
+        [_M.TLS1_3_VERSION] = "TLSv1.3",
     }
 
     function _M.get_tls1_version_str()
@@ -398,7 +400,13 @@ do
         if not ver then
             return nil, err
         end
-        return map[ver]
+
+        local ver_str = map[ver]
+        if not ver_str then
+            return nil, "unknown version"
+        end
+
+        return ver_str
     end
 end
 

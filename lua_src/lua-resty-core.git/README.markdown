@@ -26,6 +26,7 @@ Table of Contents
     * [resty.core.time](#restycoretime)
     * [resty.core.worker](#restycoreworker)
     * [resty.core.phase](#restycorephase)
+    * [resty.core.ndk](#restycorendk)
     * [ngx.semaphore](#ngxsemaphore)
     * [ngx.balancer](#ngxbalancer)
     * [ngx.ssl](#ngxssl)
@@ -49,6 +50,16 @@ This library is production ready.
 
 Synopsis
 ========
+
+This library is automatically loaded by default in OpenResty 1.15.8.1. This
+behavior can be disabled via the
+[lua_load_resty_core](https://github.com/openresty/lua-nginx-module#lua_load_resty_core)
+directive, but note that the use of this library is vividly recommended, as its
+FFI implementation is both faster, safer, and more complete than the Lua C API
+of the ngx_lua module.
+
+If you are using an older version of OpenResty, you must load this library like
+so:
 
 ```nginx
     # nginx.conf
@@ -97,8 +108,8 @@ of this library in the particular OpenResty release you are using. Otherwise you
 into serious compatibility issues.
 
 * LuaJIT 2.1 (for now, it is the v2.1 git branch in the official luajit-2.0 git repository: http://luajit.org/download.html )
-* [ngx_http_lua_module](https://github.com/openresty/lua-nginx-module) v0.10.15.
-* [ngx_stream_lua_module](https://github.com/openresty/lua-nginx-module) v0.0.6.
+* [ngx_http_lua_module](https://github.com/openresty/lua-nginx-module) v0.10.16 or v0.10.17.
+* [ngx_stream_lua_module](https://github.com/openresty/stream-lua-nginx-module) v0.0.8.
 * [lua-resty-lrucache](https://github.com/openresty/lua-resty-lrucache)
 
 [Back to TOC](#table-of-contents)
@@ -184,7 +195,7 @@ API Implemented
 * [ngx.req.start_time](https://github.com/openresty/lua-nginx-module#ngxreqstart_time)
 * [ngx.req.get_method](https://github.com/openresty/lua-nginx-module#ngxreqget_method)
 * [ngx.req.set_method](https://github.com/openresty/lua-nginx-module#ngxreqset_method)
-* [ngx.req.set_header](https://github.com/openresty/lua-nginx-module#ngxreqset_header)  (partial: table-typed header values not supported yet)
+* [ngx.req.set_header](https://github.com/openresty/lua-nginx-module#ngxreqset_header)
 * [ngx.req.clear_header](https://github.com/openresty/lua-nginx-module#ngxreqclear_header)
 
 [Back to TOC](#table-of-contents)
@@ -234,6 +245,8 @@ API Implemented
 ## resty.core.ndk
 
 * [ndk.set_var](https://github.com/openresty/lua-nginx-module#ndkset_vardirective)
+
+[Back to TOC](#table-of-contents)
 
 ## ngx.semaphore
 
