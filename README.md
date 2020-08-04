@@ -32,9 +32,12 @@ drizzle7-2011.07.21.tar.gz
 
 ## new
 
-* nginx-ts-module
-* wrk2
-* lua-nginx-module up to v0.10.16rc5
+* lua-nginx-module.git v0.10.16rc5 => v0.10.17
+* stream-lua-nginx-module.git v0.0.7 => v0.0.8
+* lua-resty-core.git v0.1.17 => v0.1.19
+* lua-resty-lrucache.git v0.09 => v0.10
+* lua-cjson.git 2.1.0.7 => 2.1.0.8
+* lua-resty-shell.git v0.02 => v0.03
 
 ## sources
 
