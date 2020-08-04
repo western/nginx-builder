@@ -24,6 +24,7 @@
 #include "ngx_stream_lua_contentby.h"
 
 
+
 static u_char *ngx_stream_lua_log_init_worker_error(ngx_log_t *log,
     u_char *buf, size_t len);
 
@@ -68,6 +69,8 @@ ngx_stream_lua_init_worker(ngx_cycle_t *cycle)
 #   endif
        )
     {
+        /* disable init_worker_by_lua* and destroy lua VM in cache processes */
+
         ngx_log_debug2(NGX_LOG_DEBUG_STREAM, ngx_cycle->log, 0,
                        "lua close the global Lua VM %p in the "
                        "cache helper process %P", lmcf->lua, ngx_pid);
@@ -77,9 +80,11 @@ ngx_stream_lua_init_worker(ngx_cycle_t *cycle)
 
         return NGX_OK;
     }
+
+
 #endif  /* NGX_WIN32 */
 
-#if NGX_STREAM_LUA_HAVE_SA_RESTART
+#if (NGX_STREAM_LUA_HAVE_SA_RESTART)
     if (lmcf->set_sa_restart) {
         ngx_stream_lua_set_sa_restart(ngx_cycle->log);
     }
@@ -120,11 +125,7 @@ ngx_stream_lua_init_worker(ngx_cycle_t *cycle)
 
     ngx_memcpy(fake_cycle, cycle, sizeof(ngx_cycle_t));
 
-#if defined(nginx_version) && nginx_version >= 9007
-
     ngx_queue_init(&fake_cycle->reusable_connections_queue);
-
-#endif
 
     if (ngx_array_init(&fake_cycle->listening, cycle->pool,
                        cycle->listening.nelts || 1,
@@ -134,16 +135,12 @@ ngx_stream_lua_init_worker(ngx_cycle_t *cycle)
         goto failed;
     }
 
-#if defined(nginx_version) && nginx_version >= 1003007
-
     if (ngx_array_init(&fake_cycle->paths, cycle->pool, cycle->paths.nelts || 1,
                        sizeof(ngx_path_t *))
         != NGX_OK)
     {
         goto failed;
     }
-
-#endif
 
     part = &cycle->open_files.part;
     ofile = part->elts;
@@ -281,25 +278,10 @@ ngx_stream_lua_init_worker(ngx_cycle_t *cycle)
         clcf->resolver_timeout = top_clcf->resolver_timeout;
     }
 
-#if defined(nginx_version) && nginx_version >= 1003014
-
-#   if nginx_version >= 1009000
-
+#if defined(nginx_version) && nginx_version >= 1009000
     ngx_set_connection_log(s->connection, clcf->error_log);
 
-#   else
-
-
-#   endif
-
 #else
-
-    c->log->file = clcf->error_log->file;
-
-    if (!(c->log->log_level & NGX_LOG_DEBUG_CONNECTION)) {
-        c->log->log_level = clcf->error_log->log_level;
-    }
-
 #endif
 
     ctx = ngx_stream_lua_create_ctx(s);

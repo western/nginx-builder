@@ -4,15 +4,18 @@ Name
 
 ngx_stream_lua_module - Embed the power of Lua into Nginx stream/TCP Servers.
 
-This module is a core component of OpenResty. If you are using this module, then you are essentially using OpenResty :)
+This module is a core component of OpenResty. If you are using this module,
+then you are essentially using OpenResty.
 
-*This module is not distributed with the Nginx source.* See [the installation instructions](#installation).
+*This module is not distributed with the Nginx source.* See [the installation
+instructions](#installation).
 
 Table of Contents
 =================
 
 * [Name](#name)
 * [Status](#status)
+* [Version](#version)
 * [Synopsis](#synopsis)
 * [Description](#description)
     * [Directives](#directives)
@@ -32,7 +35,14 @@ Table of Contents
 Status
 ======
 
-Producty ready.
+Production ready.
+
+Version
+=======
+
+This document describes ngx_stream_lua
+[v0.0.8](https://github.com/openresty/stream-lua-nginx-module/tags), which is not
+released yet.
 
 Synopsis
 ========
@@ -99,23 +109,26 @@ stream {
 }
 ```
 
+[Back to TOC](#table-of-contents)
+
 Description
 ===========
 
-This module is a core component of OpenResty. If you are using this module, then you are essentially using OpenResty :)
+This is a port of the
+[ngx_http_lua_module](https://github.com/openresty/lua-nginx-module#readme) to
+the Nginx "stream" subsystem so as to support generic stream/TCP clients.
 
-This is a port of the [ngx_http_lua_module](https://github.com/openresty/lua-nginx-module#readme) to the NGINX "stream" subsystem so
-as to support generic stream/TCP clients in the downstream.
-
-Lua APIs and directive names rename the same as the `ngx_http_lua_module`.
+The available Lua APIs and Nginx directives remain the same as those of the
+ngx_http_lua module.
 
 [Back to TOC](#table-of-contents)
 
 Directives
 ----------
 
-The following directives are ported directly from `ngx_http_lua_module`. Please check the
-documentation of `ngx_http_lua_module` for more details about their usage and behavior.
+The following directives are ported directly from ngx_http_lua. Please check
+the documentation of ngx_http_lua for more details about their usage and
+behavior.
 
 * [lua_load_resty_core](https://github.com/openresty/lua-nginx-module#lua_load_resty_core)
 * [lua_code_cache](https://github.com/openresty/lua-nginx-module#lua_code_cache)
@@ -155,11 +168,14 @@ documentation of `ngx_http_lua_module` for more details about their usage and be
 * [lua_capture_error_log](https://github.com/openresty/lua-nginx-module#lua_capture_error_log)
 * [preread_by_lua_no_postpone](#preread_by_lua_no_postpone)
 
-The [send_timeout](http://nginx.org/r/send_timeout) directive in the Nginx "http" subsystem is missing in the "stream" subsystem.
-So `ngx_stream_lua_module` uses the `lua_socket_send_timeout` for this purpose.
+The [send_timeout](https://nginx.org/r/send_timeout) directive in the Nginx
+"http" subsystem is missing in the "stream" subsystem. As such,
+ngx_stream_lua_module uses the `lua_socket_send_timeout` directive for this
+purpose instead.
 
-**Note:** the lingering close directive that used to exist in older version of stream_lua_nginx_module has been removed and can
-now be simulated with the newly added [tcpsock:shutdown](#tcpsockshutdown) method if necessary.
+**Note:** the lingering close directive that used to exist in older version of
+`stream_lua_nginx_module` has been removed and can now be simulated with the
+newly added [tcpsock:shutdown](#tcpsockshutdown) API if necessary.
 
 [Back to TOC](#table-of-contents)
 
@@ -176,9 +192,9 @@ Acts as a `preread` phase handler and executes Lua code string specified in `lua
 (or packet in datagram mode).
 The Lua code may make [API calls](#nginx-api-for-lua) and is executed as a new spawned coroutine in an independent global environment (i.e. a sandbox).
 
-It is possible to acquire raw request socket using [ngx.req.socket](https://github.com/openresty/lua-nginx-module#ngxreqsocket)
+It is possible to acquire the raw request socket using [ngx.req.socket](https://github.com/openresty/lua-nginx-module#ngxreqsocket)
 and receive data from or send data to the client. However, keep in mind that calling the `receive()` method
-of the request socket will consume the data from the buffer and those data will not be seen by handlers
+of the request socket will consume the data from the buffer and such consumed data will not be seen by handlers
 further down the chain.
 
 The `preread_by_lua_block` code will always run at the end of the `preread` processing phase unless
@@ -189,7 +205,7 @@ This directive was first introduced in the `v0.0.3` release.
 [Back to TOC](#directives)
 
 preread_by_lua_file
---------------------
+-------------------
 
 **syntax:** *preread_by_lua_file &lt;path-to-lua-script-file&gt;*
 
@@ -202,16 +218,16 @@ or LuaJIT bytecode to be executed.
 
 Nginx variables can be used in the `<path-to-lua-script-file>` string to provide flexibility. This however carries some risks and is not ordinarily recommended.
 
-When a relative path like `foo/bar.lua` is given, they will be turned into the absolute path relative to the `server prefix` path determined by the `-p PATH` command-line option while starting the Nginx server.
+When a relative path like `foo/bar.lua` is given, it will be turned into the absolute path relative to the `server prefix` path determined by the `-p PATH` command-line option given when starting the Nginx server.
 
-When the Lua code cache is turned on (by default), the user code is loaded once at the first request and cached and the Nginx config must be reloaded each time the Lua source file is modified. The Lua code cache can be temporarily disabled during development by switching [lua_code_cache](#lua_code_cache) `off` in `nginx.conf` to avoid reloading Nginx.
+When the Lua code cache is turned on (by default), the user code is loaded once at the first connection and cached. The Nginx config must be reloaded each time the Lua source file is modified. The Lua code cache can be temporarily disabled during development by switching [lua_code_cache](#lua_code_cache) `off` in `nginx.conf` to avoid having to reload Nginx.
 
 This directive was first introduced in the `v0.0.3` release.
 
 [Back to TOC](#directives)
 
 log_by_lua_block
---------------------
+----------------
 
 **syntax:** *log_by_lua_block { lua-script }*
 
@@ -219,16 +235,16 @@ log_by_lua_block
 
 **phase:** *log*
 
-Runs the Lua source code inlined as the `<lua-script-str>` at the `log` request processing phase. This does not replace the current access logs, but runs before.
+Runs the Lua source code specified as `<lua-script>` during the `log` request processing phase. This does not replace the current access logs, but runs before.
 
-Yielding APIs in this phase, such as `ngx.req.socket`, `ngx.socket.*`, `ngx.sleep`, `ngx.say` are **not** available in this phase.
+Yielding APIs such as `ngx.req.socket`, `ngx.socket.*`, `ngx.sleep`, or `ngx.say` are **not** available in this phase.
 
 This directive was first introduced in the `v0.0.3` release.
 
 [Back to TOC](#directives)
 
 log_by_lua_file
---------------------
+---------------
 
 **syntax:** *log_by_lua_file &lt;path-to-lua-script-file&gt;*
 
@@ -241,9 +257,9 @@ or LuaJIT bytecode to be executed.
 
 Nginx variables can be used in the `<path-to-lua-script-file>` string to provide flexibility. This however carries some risks and is not ordinarily recommended.
 
-When a relative path like `foo/bar.lua` is given, they will be turned into the absolute path relative to the `server prefix` path determined by the `-p PATH` command-line option while starting the Nginx server.
+When a relative path like `foo/bar.lua` is given, it will be turned into the absolute path relative to the `server prefix` path determined by the `-p PATH` command-line option given when starting the Nginx server.
 
-When the Lua code cache is turned on (by default), the user code is loaded once at the first request and cached and the Nginx config must be reloaded each time the Lua source file is modified. The Lua code cache can be temporarily disabled during development by switching [lua_code_cache](#lua_code_cache) `off` in `nginx.conf` to avoid reloading Nginx.
+When the Lua code cache is turned on (by default), the user code is loaded once at the first connection and cached. The Nginx config must be reloaded each time the Lua source file is modified. The Lua code cache can be temporarily disabled during development by switching [lua_code_cache](#lua_code_cache) `off` in `nginx.conf` to avoid having to reload Nginx.
 
 This directive was first introduced in the `v0.0.3` release.
 
@@ -256,11 +272,11 @@ lua_add_variable
 
 **context:** *stream*
 
-Add variable `$var` to the stream subsystem and makes it changeable. If `$var` already exists,
+Add the variable `$var` to the "stream" subsystem and makes it changeable. If `$var` already exists,
 this directive will do nothing.
 
 By default, variables added using this directive are considered "not found" and reading them
-using `ngx.var` will return `nil`. However, they could be re-assigned using `ngx.var` code at any time.
+using `ngx.var` will return `nil`. However, they could be re-assigned via the `ngx.var.VARIABLE` API at any time.
 
 This directive was first introduced in the `v0.0.4` release.
 
@@ -284,12 +300,12 @@ This directive was first introduced in the `v0.0.4` release.
 Nginx API for Lua
 -----------------
 
-Many Lua API functions are ported from the `ngx_http_lua_module`. Check out the official manual of
-`ngx_http_lua_module` for more details on these Lua API functions.
+Many Lua API functions are ported from ngx_http_lua. Check out the official
+manual of ngx_http_lua for more details on these Lua API functions.
 
 * [ngx.var.VARIABLE](https://github.com/openresty/lua-nginx-module#ngxvarvariable)
 
-This module fully supports the new variable subsystem inside the NGINX stream core. You may access any
+This module fully supports the new variable subsystem inside the Nginx stream core. You may access any
 [built-in variables](https://nginx.org/en/docs/stream/ngx_stream_core_module.html#variables) provided by the stream core or
 other stream modules.
 * [Core constants](https://github.com/openresty/lua-nginx-module#core-constants)
@@ -304,20 +320,23 @@ other stream modules.
 * [ngx.balancer](https://github.com/openresty/lua-resty-core/blob/master/lib/ngx/balancer.md)
 
 Only raw request sockets are supported, for obvious reasons. The `raw` argument value
-is ignored and the raw request socket is always returned. Unlike `ngx_http_lua_module`,
+is ignored and the raw request socket is always returned. Unlike ngx_http_lua,
 you can still call output API functions like `ngx.say`, `ngx.print`, and `ngx.flush`
 after acquiring the raw request socket via this function.
 
-When stream server is in UDP mode, reading from the downstream socket returned by the
+When the stream server is in UDP mode, reading from the downstream socket returned by the
 `ngx.req.socket` call will only return the content of a single packet. Therefore
 the reading call will never block and will return `nil, "no more data"` when all the
 data from the datagram has been consumed. However, you may choose to send multiple UDP
 packets back to the client using the downstream socket.
 
-Raw TCP request socket returned by this module will contain the following extra method:
+The raw TCP sockets returned by this module will contain the following extra method:
+
+[Back to TOC](#directives)
 
 tcpsock:shutdown
 ----------------
+
 **syntax:** *ok, err = tcpsock:shutdown("send")*
 
 **context:** *content_by_lua&#42;*
@@ -333,15 +352,15 @@ before calling this method, consider use `ngx.flush(true)` to make sure all busy
 flushed before shutting down the socket. If any busy buffers were detected, this method will return `nil`
 will error message `"socket busy writing"`.
 
-This feature is particularly useful for protocols that generates response before actually
-finishes consuming all incoming data. Normally Kernel will send out RST to the client when
+This feature is particularly useful for protocols that generate a response before actually
+finishing consuming all incoming data. Normally, the kernel will send RST to the client when
 [tcpsock:close](https://github.com/openresty/lua-nginx-module#tcpsockclose) is called without
 emptying the receiving buffer first. Calling this method will allow you to keep reading from
 the receiving buffer and prevents RST from being sent.
 
 You can also use this method to simulate lingering close similar to that
 [provided by the ngx_http_core_module](https://nginx.org/en/docs/http/ngx_http_core_module.html#lingering_close)
-for protocols that needs such behavior. Here is an example:
+for protocols in need of such behavior. Here is an example:
 
 ```lua
 local LINGERING_TIME = 30 -- 30 seconds
@@ -366,19 +385,20 @@ until (not data and not partial) or ngx.time() >= deadline
 
 reqsock:peek
 ------------
+
 **syntax:** *ok, err = reqsock:peek(size)*
 
 **context:** *preread_by_lua&#42;*
 
 Peeks into the [preread](https://nginx.org/en/docs/stream/stream_processing.html#preread_phase)
 buffer that contains downstream data sent by the client without consuming them.
-That is, data returned by this API will still be forwarded to upstream in later phases.
+That is, data returned by this API will still be forwarded upstream in later phases.
 
 This function takes a single required argument, `size`, which is the number of bytes to be peeked.
 Repeated calls to this function always returns data from the beginning of the preread buffer.
 
-Note that preread phase happens after TLS handshake. If the stream server was configured with
-TLS enabled, data returned will be in clear text.
+Note that preread phase happens after the TLS handshake. If the stream server was configured with
+TLS enabled, the returned data will be in clear text.
 
 If preread buffer does not have the requested amount of data, then the current Lua thread will
 be yielded until more data is available, [`preread_buffer_size`](https://nginx.org/en/docs/stream/ngx_stream_core_module.html#preread_buffer_size)
@@ -398,9 +418,9 @@ the current stream session will be terminated with the
 In both cases, no further processing on the session is possible (except `log_by_lua*`). The connection will be closed by the
 stream core module automatically.
 
-Note that this API can not be used if consumption of client data has occurred. For example, after calling
-`reqsock:receive`. If such attempt was made, Lua error `"attempt to peek on a consumed socket"` will
-be thrown. Consuming client data after calling this API safe and allowed.
+Note that this API cannot be used if consumption of client data has occurred. For example, after calling
+`reqsock:receive`. If such an attempt was made, the Lua error `"attempt to peek on a consumed socket"` will
+be thrown. Consuming client data after calling this API is allowed and safe.
 
 Here is an example of using this API:
 
@@ -492,10 +512,7 @@ TODO
 ====
 
 * Add new directives `access_by_lua_block` and `access_by_lua_file`.
-* Add new directives `ssl_certificate_by_lua_block` and `ssl_certificate_by_lua_file`.
-* Add `ngx.semaphore` API.
-* Add support for [lua-resty-core](https://github.com/openresty/lua-resty-core).
-* Add `lua_postpone_output` to emulate the [postpone_output](http://nginx.org/r/postpone_output) directive.
+* Add `lua_postpone_output` to emulate the [postpone_output](https://nginx.org/r/postpone_output) directive.
 
 [Back to TOC](#table-of-contents)
 
@@ -504,35 +521,48 @@ Nginx Compatibility
 
 The latest version of this module is compatible with the following versions of Nginx:
 
-* 1.13.x >= 1.13.6
+* 1.17.x (last tested: 1.17.8)
+* 1.15.x (last tested: 1.15.8)
+* 1.13.x (last tested: 1.13.6)
 
-Nginx cores older than 1.13.6 (exclusive) are *not* tested and may or may not work. Use at your own risk!
+Nginx cores older than 1.13.6 (exclusive) are *not* tested and may or may not
+work. Use at your own risk!
 
 [Back to TOC](#table-of-contents)
 
 Installation
 ============
 
-This module can be manually compiled into Nginx or OpenResty:
+It is *highly* recommended to use [OpenResty releases](https://openresty.org)
+which bundle Nginx, ngx_http_lua, ngx_stream_lua, (this module), LuaJIT, as
+well as other powerful companion Nginx modules and Lua libraries.
 
-1. Install LuaJIT 2.1 or Lua 5.1 (Lua 5.2+ are *not* supported yet). LuaJIT can be downloaded from the [the LuaJIT project website](http://luajit.org/download.html) and Lua 5.1, from the [Lua project website](http://www.lua.org/).  Some distribution package managers also distribute LuaJIT and/or Lua.
-1. Download the latest version of ngx_stream_lua [HERE](https://github.com/openresty/stream-lua-nginx-module/tags).
-1. Download the latest supported version of NGINX [HERE](http://nginx.org/) (See [Nginx Compatibility](#nginx-compatibility)) or the OpenResty bundle from [HERE](https://openresty.org/).
+It is discouraged to build this module with Nginx yourself since it is tricky
+to set up exactly right.
 
-Build the source of NGINX or OpenResty with this module, like below:
+Note that Nginx, LuaJIT, and OpenSSL official releases have various limitations
+and long standing bugs that can cause some of this module's features to be
+disabled, not work properly, or run slower. Official OpenResty releases are
+recommended because they bundle [OpenResty's optimized LuaJIT 2.1 fork](https://github.com/openresty/luajit2) and
+[Nginx/OpenSSL
+patches](https://github.com/openresty/openresty/tree/master/patches).
+
+Alternatively, ngx_stream_lua can be manually compiled into Nginx:
+
+1. LuaJIT can be downloaded from the [latest release of OpenResty's LuaJIT fork](https://github.com/openresty/luajit2/releases). The official LuaJIT 2.x releases are also supported, although performance will be significantly lower for reasons elaborated above
+1. Download the latest version of ngx_stream_lua [HERE](https://github.com/openresty/stream-lua-nginx-module/tags)
+1. Download the latest supported version of Nginx [HERE](https://nginx.org/) (See [Nginx Compatibility](#nginx-compatibility))
+
+Build the source with this module:
 
 ```bash
-wget 'http://nginx.org/download/nginx-1.13.6.tar.gz'
+wget 'https://nginx.org/download/nginx-1.13.6.tar.gz'
 tar -xzvf nginx-1.13.6.tar.gz
 cd nginx-1.13.6/
 
 # tell nginx's build system where to find LuaJIT 2.1:
 export LUAJIT_LIB=/path/to/luajit/lib
 export LUAJIT_INC=/path/to/luajit/include/luajit-2.1
-
-# or tell where to find Lua if using Lua instead:
-#export LUA_LIB=/path/to/lua/lib
-#export LUA_INC=/path/to/lua/include
 
 # Here we assume Nginx is to be installed under /opt/nginx/.
 ./configure --prefix=/opt/nginx \
@@ -546,8 +576,9 @@ make -j4
 make install
 ```
 
-You may use `--without-http` if you do not wish to use this module with the HTTP subsystem.
-ngx_stream_lua will work perfectly fine without the presense of the HTTP subsystem.
+You may use `--without-http` if you do not wish to use this module with the
+"http" subsystem. ngx_stream_lua will work perfectly fine without the "http"
+subsystem.
 
 [Back to TOC](#table-of-contents)
 
@@ -573,7 +604,8 @@ The [openresty](https://groups.google.com/group/openresty) mailing list is for C
 Code Repository
 ===============
 
-The code repository of this project is hosted on github at [openresty/stream-lua-nginx-module](https://github.com/openresty/stream-lua-nginx-module).
+The code repository of this project is hosted on GitHub at
+[openresty/stream-lua-nginx-module](https://github.com/openresty/stream-lua-nginx-module).
 
 [Back to TOC](#table-of-contents)
 
@@ -597,6 +629,8 @@ work:
 to make code sharing between this module and [lua-nginx-module](https://github.com/openresty/lua-nginx-module) possible.
 * `balancer_by_lua_*`, `preread_by_lua_*`, `log_by_lua_*` and `ssl_certby_lua*` phases support.
 * [`reqsock:peek`](#reqsockpeek) API support.
+
+[Back to TOC](#table-of-contents)
 
 Copyright and License
 =====================
