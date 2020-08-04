@@ -45,13 +45,13 @@ v0.0.1
 * github.com/openresty/memc-nginx-module.git
 v0.19
 * github.com/openresty/lua-nginx-module.git
-v0.10.16rc5
+v0.10.17
 * github.com/simplresty/ngx_devel_kit.git
 v0.3.1
 * github.com/openresty/redis2-nginx-module.git
 v0.15
 * github.com/openresty/echo-nginx-module.git
-v0.62rc1
+v0.62
 * github.com/calio/form-input-nginx-module.git
 v0.12
 * github.com/openresty/set-misc-nginx-module.git
@@ -79,7 +79,7 @@ v0.1.11
 * github.com/nginx/njs.git
 0.4.2
 * github.com/openresty/stream-lua-nginx-module.git
-v0.0.7
+v0.0.8
 * github.com/openresty/xss-nginx-module.git
 v0.06
 * github.com/arut/nginx-rtmp-module.git
@@ -89,13 +89,13 @@ v0.1.1
 * github.com/openresty/luajit2.git
 v2.1-20200102
 * github.com/openresty/lua-resty-core.git
-v0.1.17
+v0.1.19
 * github.com/openresty/lua-resty-lrucache.git
-v0.09
+v0.10rc1
 * github.com/openresty/lua-cjson.git
-2.1.0.7
+2.1.0.8
 * github.com/openresty/lua-resty-redis.git
-v0.28rc1
+v0.28
 * github.com/cloudflare/lua-resty-cookie.git
 v0.1.0
 * github.com/openresty/lua-resty-mysql.git
@@ -107,13 +107,13 @@ v0.02
 * github.com/openresty/lua-tablepool.git
 v0.01
 * github.com/openresty/lua-resty-shell.git
-v0.02
+v0.03
 * github.com/openresty/lua-resty-limit-traffic.git
-v0.06
+v0.07
 * github.com/openresty/lua-resty-lock.git
 v0.08
 * github.com/openresty/lua-resty-string.git
-v0.12rc1
+v0.12
 * github.com/openresty/lua-resty-upload.git
 v0.10
 * github.com/openresty/lua-resty-websocket.git
