@@ -14,7 +14,7 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-prefix=/usr/local
+prefix=/home/andrey/Code/nginx-builder.git/etc_src/drizzle7-2011.07.21/build
 exec_prefix=${prefix}
 
 grep solaris.smf.value.drizzle /etc/security/auth_attr > /dev/null
